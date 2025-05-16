@@ -49,13 +49,16 @@ export default function AddSnippetDialog() {
     
     try {
       // Create snippet with minimal fields
-      await apiRequest('/api/snippets', 'POST', {
-        title,
-        code,
-        description: description || null,
-        language,
-        tags: [],
-        userId: null
+      await apiRequest('/api/snippets', {
+        method: 'POST',
+        data: {
+          title,
+          code,
+          description: description || null,
+          language,
+          tags: [],
+          userId: null
+        }
       });
       
       toast({
