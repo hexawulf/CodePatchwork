@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, Plus, User, Sun, Moon } from "lucide-react";
 import SearchBar from "./SearchBar";
+import AddSnippetDialog from "./AddSnippetDialog";
 
 interface HeaderProps {
   toggleMobileMenu: () => void;
@@ -20,7 +21,11 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
     }
   };
   
+  // Managing dialog state directly in header instead of separate button
+  const [snippetDialogOpen, setSnippetDialogOpen] = useState(false);
+  
   const openCreateModal = () => {
+    setSnippetDialogOpen(true);
     console.log("Open create modal clicked");
   };
   
@@ -56,12 +61,19 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
             )}
           </button>
           
+          {/* Add Snippet Dialog - This is the single place to add new snippets */}
+          <div className="hidden md:block">
+            <AddSnippetDialog />
+          </div>
+          
+          {/* Mobile version of Add Snippet button */}
           <Button 
             onClick={openCreateModal}
-            className="hidden md:flex items-center"
+            className="md:hidden flex items-center"
+            size="sm"
           >
-            <Plus className="h-5 w-5 mr-1" />
-            New Snippet
+            <Plus className="h-4 w-4 mr-1" />
+            Add
           </Button>
           
           <div className="relative">
@@ -81,6 +93,9 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
       <div className="md:hidden p-2 bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-slate-700">
         <SearchBar />
       </div>
+      
+      {/* Mobile AddSnippetDialog - controlled by mobile button */}
+      <AddSnippetDialog open={snippetDialogOpen} onOpenChange={setSnippetDialogOpen} />
     </>
   );
 }
