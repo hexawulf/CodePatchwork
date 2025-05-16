@@ -1,13 +1,13 @@
 import { useState } from "react";
 import Layout from "@/components/Layout";
-import { useQuery } from "@tanstack/react-query";
 import { Collection } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Plus, FolderOpen, Pencil, Trash2, MoreVertical } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useCollectionContext } from "@/contexts/CollectionContext";
+import CollectionDialog from "@/components/CollectionDialog";
 
 export default function Collections() {
   const { toast } = useToast();

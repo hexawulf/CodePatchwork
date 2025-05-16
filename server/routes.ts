@@ -190,6 +190,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to create collection" });
     }
   });
+  
+  app.put("/api/collections/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const parsedBody = insertCollectionSchema.parse(req.body);
+      
+      const collection = await storage.getCollection(id);
+      if (!collection) {
+        return res.status(404).json({ message: "Collection not found" });
+      }
+      
+      const updatedCollection = await storage.updateCollection(id, parsedBody);
+      res.json(updatedCollection);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid collection data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error updating collection:", error);
+      res.status(500).json({ message: "Failed to update collection" });
+    }
+  });
+  
+  app.delete("/api/collections/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const collection = await storage.getCollection(id);
+      if (!collection) {
+        return res.status(404).json({ message: "Collection not found" });
+      }
+      
+      await storage.deleteCollection(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting collection:", error);
+      res.status(500).json({ message: "Failed to delete collection" });
+    }
+  });
 
   app.post("/api/collections/:collectionId/snippets/:snippetId", async (req, res) => {
     try {

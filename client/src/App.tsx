@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { SnippetProvider } from "@/contexts/SnippetContext";
+import { CollectionProvider } from "@/contexts/CollectionContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
@@ -45,10 +46,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <SnippetProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <CollectionProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </CollectionProvider>
         </SnippetProvider>
       </ThemeProvider>
     </QueryClientProvider>
