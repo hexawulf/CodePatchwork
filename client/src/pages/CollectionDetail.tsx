@@ -43,7 +43,7 @@ export default function CollectionDetail() {
     data: snippets = [], 
     isLoading: isLoadingSnippets,
     error: snippetsError
-  } = useQuery({
+  } = useQuery<Snippet[]>({
     queryKey: ["/api/collections", collectionId, "snippets"],
     enabled: collectionId !== null,
     retry: 1

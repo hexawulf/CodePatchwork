@@ -3,11 +3,12 @@ import { type Snippet } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Star, Copy, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Star, Copy, MoreVertical, Pencil, Trash2, FolderPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CodeBlock from "./CodeBlock";
 import { useSnippetContext } from "@/contexts/SnippetContext";
 import AddSnippetDialog from "./AddSnippetDialog";
+import AddToCollectionDialog from "./AddToCollectionDialog";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +38,7 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   const { toast } = useToast();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCollectionDialogOpen, setIsCollectionDialogOpen] = useState(false);
   
   // Function to get language color
   const getLanguageColor = (language: string) => {
@@ -147,6 +149,10 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
                 <DropdownMenuItem onClick={copyToClipboard}>
                   <Copy className="h-4 w-4 mr-2" />
                   Copy code
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsCollectionDialogOpen(true)}>
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  Add to collection
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleEdit}>
                   <Pencil className="h-4 w-4 mr-2" />
@@ -261,6 +267,13 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
         onOpenChange={setIsEditDialogOpen}
         snippetToEdit={snippet}
         isEditMode={true}
+      />
+      
+      {/* Add to Collection Dialog */}
+      <AddToCollectionDialog
+        open={isCollectionDialogOpen}
+        onOpenChange={setIsCollectionDialogOpen}
+        snippet={snippet}
       />
     </div>
   );

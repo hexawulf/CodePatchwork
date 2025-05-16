@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import { Collection } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ export default function Collections() {
   const [collectionToDelete, setCollectionToDelete] = useState<Collection | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [, navigate] = useLocation();
   
   const { 
     deleteCollection, 
@@ -70,8 +72,8 @@ export default function Collections() {
   // Handle view collection snippets
   const handleViewSnippets = (collectionId: number) => {
     setActiveCollectionId(collectionId);
-    // Navigate to a collection detail page
-    // We could implement this later with wouter navigation
+    // Navigate to collection detail page
+    navigate(`/collections/${collectionId}`);
   };
 
   if (isLoading) {
