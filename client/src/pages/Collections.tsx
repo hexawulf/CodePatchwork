@@ -8,13 +8,31 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useCollectionContext } from "@/contexts/CollectionContext";
 import CollectionDialog from "@/components/CollectionDialog";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Collections() {
-  const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [collectionToDelete, setCollectionToDelete] = useState<Collection | null>(null);
-
-  // Fetch collections
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  
+  const { 
+    deleteCollection, 
+    openEditModal,
+    collectionToEdit,
+    isCreateModalOpen,
+    openCreateModal,
+    closeCreateModal,
+    isEditModalOpen,
+    closeEditModal,
+    setActiveCollectionId
+  } = useCollectionContext();
+  
+  // Get hooks
+  const { toast } = useToast();
+  
+  // Fetch collections with TanStack Query
   const { data: collections = [], isLoading, error } = useQuery<Collection[]>({
     queryKey: ["/api/collections"],
     retry: 1
@@ -22,12 +40,13 @@ export default function Collections() {
 
   // Handle open create collection modal
   const handleOpenCreateModal = () => {
-    console.log("Open create collection modal");
+    setShowCreateDialog(true);
   };
 
   // Handle edit collection
   const handleEditCollection = (collection: Collection) => {
-    console.log("Edit collection", collection);
+    openEditModal(collection);
+    setShowEditDialog(true);
   };
 
   // Handle delete collection
@@ -41,22 +60,18 @@ export default function Collections() {
     if (!collectionToDelete) return;
     
     try {
-      console.log("Delete collection", collectionToDelete.id);
-      // Would call a delete API here in full implementation
-      toast({
-        title: "Collection deleted",
-        description: "The collection has been deleted successfully."
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete the collection. Please try again.",
-        variant: "destructive"
-      });
+      await deleteCollection(collectionToDelete.id);
     } finally {
       setShowDeleteDialog(false);
       setCollectionToDelete(null);
     }
+  };
+  
+  // Handle view collection snippets
+  const handleViewSnippets = (collectionId: number) => {
+    setActiveCollectionId(collectionId);
+    // Navigate to a collection detail page
+    // We could implement this later with wouter navigation
   };
 
   if (isLoading) {
@@ -181,7 +196,7 @@ export default function Collections() {
                 <Button 
                   variant="link" 
                   className="p-0 h-auto text-sm text-primary-600 dark:text-primary-400 font-normal"
-                  onClick={() => console.log(`View snippets in collection ${collection.id}`)}
+                  onClick={() => handleViewSnippets(collection.id)}
                 >
                   View snippets
                 </Button>
@@ -213,6 +228,20 @@ export default function Collections() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Create Collection Dialog */}
+      <CollectionDialog 
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+      />
+      
+      {/* Edit Collection Dialog */}
+      <CollectionDialog 
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        collectionToEdit={collectionToEdit}
+        isEditMode={true}
+      />
     </Layout>
   );
 }
