@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { useSnippetContext } from "@/contexts/SnippetContext";
 import { Search } from "lucide-react";
 import { debounce } from "@/lib/utils";
 
 export default function SearchBar() {
-  const { searchTerm, setSearchTerm } = useSnippetContext();
-  const [inputValue, setInputValue] = useState(searchTerm);
+  // Temporary local state for search while fixing context
+  const [searchTerm, setSearchTerm] = useState("");
+  const [inputValue, setInputValue] = useState("");
   
   // Debounce the search term update to prevent too many API calls
   const debouncedSetSearchTerm = useCallback(
