@@ -209,8 +209,8 @@ export default function CreateSnippetModal({
                     </FormControl>
                     <SelectContent>
                       {LANGUAGES.map((lang) => (
-                        <SelectItem key={lang} value={lang.toLowerCase()}>
-                          {lang}
+                        <SelectItem key={lang.value} value={lang.value}>
+                          {lang.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
