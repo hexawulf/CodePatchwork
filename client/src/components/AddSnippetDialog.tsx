@@ -118,12 +118,15 @@ export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }:
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="flex items-center">
-          <Plus className="h-4 w-4 mr-1" />
-          New Snippet
-        </Button>
-      </DialogTrigger>
+      {/* Only render the trigger button when not controlled externally */}
+      {!isControlled && (
+        <DialogTrigger asChild>
+          <Button size="sm" className="flex items-center">
+            <Plus className="h-4 w-4 mr-1" />
+            New Snippet
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Create New Snippet</DialogTitle>

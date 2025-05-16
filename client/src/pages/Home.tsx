@@ -1,6 +1,5 @@
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
-import AddSnippetDialog from "@/components/AddSnippetDialog";
 import { useSnippets } from "@/hooks/useSnippets";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -91,8 +90,6 @@ export default function Home() {
               <List className="h-5 w-5" />
             </Button>
           </div>
-          
-          <AddSnippetDialog />
         </div>
       </div>
       
