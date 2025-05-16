@@ -7,6 +7,7 @@ import { Star, Copy, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CodeBlock from "./CodeBlock";
 import { useSnippetContext } from "@/contexts/SnippetContext";
+import AddSnippetDialog from "./AddSnippetDialog";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -32,9 +33,10 @@ interface SnippetCardProps {
 
 export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   // Use the context for all operations
-  const { openEditModal, toggleFavorite, deleteSnippet } = useSnippetContext();
+  const { toggleFavorite, deleteSnippet } = useSnippetContext();
   const { toast } = useToast();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   // Function to get language color
   const getLanguageColor = (language: string) => {
@@ -71,7 +73,7 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   
   // Function to handle edit
   const handleEdit = () => {
-    openEditModal(snippet);
+    setIsEditDialogOpen(true);
   };
   
   // Function to handle delete
@@ -230,6 +232,14 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Snippet Dialog */}
+      <AddSnippetDialog 
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        snippetToEdit={snippet}
+        isEditMode={true}
+      />
     </div>
   );
 }
