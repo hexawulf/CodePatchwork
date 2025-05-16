@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSnippetSchema } from "@shared/schema";
-import { useSnippetContext } from "@/contexts/SnippetContext";
+import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,9 +23,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import CodeBlock from "./CodeBlock";
 import { LANGUAGES } from "@/lib/constants";
+import { apiRequest } from "@/lib/queryClient";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Extend the snippet schema with validation
 const snippetFormSchema = insertSnippetSchema.extend({
@@ -36,21 +45,36 @@ const snippetFormSchema = insertSnippetSchema.extend({
 
 type SnippetFormValues = z.infer<typeof snippetFormSchema>;
 
-export default function CreateSnippetModal() {
-  const { closeCreateModal, createSnippet, snippetToEdit, isEditModalOpen, closeEditModal, updateSnippet } = useSnippetContext();
+interface CreateSnippetModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  snippetToEdit?: any;
+  isEditMode?: boolean;
+}
+
+export default function CreateSnippetModal({
+  isOpen,
+  onClose,
+  snippetToEdit = null,
+  isEditMode = false
+}: CreateSnippetModalProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedLanguage, setSelectedLanguage] = useState(snippetToEdit?.language || "javascript");
+  const [tagInput, setTagInput] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>(snippetToEdit?.tags || []);
   
-  // Initialize form with default values or snippet to edit
+  // Initialize form
   const form = useForm<SnippetFormValues>({
     resolver: zodResolver(snippetFormSchema),
     defaultValues: {
       title: snippetToEdit?.title || "",
       description: snippetToEdit?.description || "",
       code: snippetToEdit?.code || "",
-      language: snippetToEdit?.language || "javascript",
+      language: snippetToEdit?.language || "javascript", 
       tags: snippetToEdit?.tags || [],
-      userId: null,
-    },
+      userId: null
+    }
   });
   
   const isSubmitting = form.formState.isSubmitting;
@@ -58,240 +82,229 @@ export default function CreateSnippetModal() {
   // Handle form submission
   const onSubmit = async (values: SnippetFormValues) => {
     try {
-      if (isEditModalOpen && snippetToEdit) {
-        await updateSnippet(snippetToEdit.id, values);
-        closeEditModal();
+      if (isEditMode && snippetToEdit) {
+        // Update existing snippet
+        await apiRequest(`/api/snippets/${snippetToEdit.id}`, 'PATCH', values);
+        
+        toast({
+          title: "Success",
+          description: "Snippet updated successfully",
+        });
       } else {
-        await createSnippet(values);
-        closeCreateModal();
+        // Create new snippet
+        await apiRequest('/api/snippets', 'POST', values);
+        
+        toast({
+          title: "Success",
+          description: "Snippet created successfully",
+        });
       }
+      
+      // Invalidate and refetch snippets
+      queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
+      
+      // Close modal and reset form
+      onClose();
+      form.reset();
     } catch (error) {
       console.error("Error saving snippet:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save snippet. Please try again.",
+        variant: "destructive",
+      });
     }
   };
   
-  // Close the modal
-  const handleClose = () => {
-    if (isEditModalOpen) {
-      closeEditModal();
-    } else {
-      closeCreateModal();
+  // Handle adding tags
+  const handleAddTag = () => {
+    if (tagInput.trim() && !selectedTags.includes(tagInput.trim())) {
+      const newTags = [...selectedTags, tagInput.trim()];
+      setSelectedTags(newTags);
+      form.setValue('tags', newTags);
+      setTagInput("");
     }
   };
   
-  // Handle tag input
-  const handleTagInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const input = e.currentTarget;
-    const value = input.value.trim();
-    
-    if ((e.key === 'Enter' || e.key === ',') && value) {
+  // Handle removing tags
+  const handleRemoveTag = (tagToRemove: string) => {
+    const newTags = selectedTags.filter(tag => tag !== tagToRemove);
+    setSelectedTags(newTags);
+    form.setValue('tags', newTags);
+  };
+  
+  // Handle keyboard events for tags
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      
-      // Get current tags
-      const currentTags = form.getValues("tags") || [];
-      
-      // Add new tag if it doesn't already exist
-      if (!currentTags.includes(value)) {
-        form.setValue("tags", [...currentTags, value]);
-        input.value = '';
-      }
+      handleAddTag();
     }
   };
-  
-  // Remove tag
-  const removeTag = (tagToRemove: string) => {
-    const currentTags = form.getValues("tags") || [];
-    form.setValue(
-      "tags", 
-      currentTags.filter(tag => tag !== tagToRemove)
-    );
-  };
+
+  if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-            {isEditModalOpen ? "Edit Snippet" : "Create New Snippet"}
-          </h2>
-          <button 
-            onClick={handleClose}
-            className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {isEditMode ? "Edit Snippet" : "Create New Snippet"}
+          </DialogTitle>
+        </DialogHeader>
         
-        <div className="p-4 overflow-y-auto max-h-[calc(90vh-7rem)]">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Title field */}
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter snippet title" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Description field */}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Enter a brief description" 
+                      {...field} 
+                      value={field.value || ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Language select */}
+            <FormField
+              control={form.control}
+              name="language"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Language</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      setSelectedLanguage(value);
+                    }}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
-                      <Input placeholder="Name your snippet" {...field} />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a language" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Briefly describe your snippet" 
-                        className="resize-none" 
-                        value={field.value || ''}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Supports markdown formatting
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="language"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Language</FormLabel>
-                      <Select 
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          setSelectedLanguage(value);
-                        }} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select language" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {LANGUAGES.map(lang => (
-                            <SelectItem key={lang.value} value={lang.value}>
-                              {lang.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="tags"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>Tags</FormLabel>
-                      <FormControl>
-                        <div>
-                          <Input 
-                            placeholder="Add tags, press Enter or comma to add" 
-                            onKeyDown={handleTagInput}
-                          />
-                          
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {form.watch("tags")?.map(tag => (
-                              <div 
-                                key={tag} 
-                                className="flex items-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded px-2 py-1 text-xs"
-                              >
-                                <span>{tag}</span>
-                                <button 
-                                  type="button" 
-                                  onClick={() => removeTag(tag)}
-                                  className="ml-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Separate tags with commas
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                    <SelectContent>
+                      {LANGUAGES.map((lang) => (
+                        <SelectItem key={lang} value={lang.toLowerCase()}>
+                          {lang}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Code field */}
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Code</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Paste your code here" 
+                      className="min-h-[200px] font-mono"
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Preview */}
+            {form.watch("code") && (
+              <div className="border rounded-md p-4">
+                <h3 className="text-sm font-medium mb-2">Preview</h3>
+                <CodeBlock 
+                  code={form.watch("code")} 
+                  language={selectedLanguage} 
+                  showLineNumbers={true}
                 />
               </div>
+            )}
+            
+            {/* Tags input */}
+            <div>
+              <FormLabel>Tags</FormLabel>
+              <div className="flex items-center space-x-2">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  placeholder="Add tags (press Enter)"
+                  className="flex-1"
+                />
+                <Button type="button" onClick={handleAddTag} variant="secondary" size="sm">
+                  Add
+                </Button>
+              </div>
               
-              <FormField
-                control={form.control}
-                name="code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Code</FormLabel>
-                    <div className="border border-slate-300 dark:border-slate-600 rounded-md overflow-hidden">
-                      <div className="bg-slate-100 dark:bg-slate-700 px-3 py-1 flex items-center justify-between">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                          {selectedLanguage}
-                        </span>
-                      </div>
-                      <div className="relative">
-                        <FormControl>
-                          <Textarea 
-                            className="font-mono text-sm p-3 min-h-32 bg-slate-50 dark:bg-slate-800 border-0 focus-visible:ring-0 resize-none"
-                            placeholder="Paste or type your code here"
-                            {...field}
-                          />
-                        </FormControl>
-                        
-                        {field.value && (
-                          <div className="absolute inset-0 opacity-0 pointer-events-none">
-                            <CodeBlock code={field.value} language={selectedLanguage} />
-                          </div>
-                        )}
-                      </div>
+              {/* Tags display */}
+              {selectedTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedTags.map((tag) => (
+                    <div
+                      key={tag}
+                      className="flex items-center bg-secondary text-secondary-foreground rounded-full px-3 py-1 text-sm"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="ml-2 text-secondary-foreground/70 hover:text-secondary-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-        </div>
-        
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end space-x-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Saving..." : (isEditModalOpen ? "Update Snippet" : "Save Snippet")}
-          </Button>
-        </div>
-      </div>
-    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onClose}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : isEditMode ? "Update" : "Create"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }
