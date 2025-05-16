@@ -49,9 +49,10 @@ export default function AddSnippetDialog() {
     
     try {
       // Create snippet with minimal fields
-      await apiRequest('/api/snippets', {
-        method: 'POST',
-        data: {
+      await apiRequest(
+        'POST',
+        '/api/snippets',
+        {
           title,
           code,
           description: description || null,
@@ -59,7 +60,7 @@ export default function AddSnippetDialog() {
           tags: [],
           userId: null
         }
-      });
+      );
       
       toast({
         title: "Success",
