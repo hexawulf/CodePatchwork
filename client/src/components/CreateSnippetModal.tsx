@@ -141,7 +141,7 @@ export default function CreateSnippetModal({
     }
   };
 
-  if (!isOpen) return null;
+  console.log("CreateSnippetModal - isOpen:", isOpen);
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
