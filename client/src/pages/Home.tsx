@@ -15,12 +15,14 @@ import {
 } from "@/components/ui/select";
 
 export default function Home() {
-  // Temporarily remove context dependency for debugging
-  const isCreateModalOpen = false;
-  const openCreateModal = () => {};
-  const searchTerm = "";
-  const activeLanguage = null;
-  const activeTag = null;
+  // Use context for global state
+  const { 
+    isCreateModalOpen, 
+    openCreateModal, 
+    searchTerm, 
+    activeLanguage, 
+    activeTag 
+  } = useSnippetContext();
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOrder, setSortOrder] = useState<string>("recent");
@@ -113,7 +115,7 @@ export default function Home() {
         viewMode={viewMode}
       />
       
-      {/* Create Snippet Modal */}
+      {/* Create/Edit Snippet Modal */}
       {isCreateModalOpen && <CreateSnippetModal />}
     </Layout>
   );
