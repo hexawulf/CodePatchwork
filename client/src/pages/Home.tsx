@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
-import CreateSnippetModal from "@/components/CreateSnippetModal";
+import AddSnippetDialog from "@/components/AddSnippetDialog";
 import { useSnippets } from "@/hooks/useSnippets";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,10 @@ import {
 } from "@/components/ui/select";
 
 export default function Home() {
-  // Use local state for now until context issues are resolved
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // Local state for filtering and display
   const [searchTerm, setSearchTerm] = useState("");
   const [activeLanguage, setActiveLanguage] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  
-  const openCreateModal = () => setIsCreateModalOpen(true);
-  const closeCreateModal = () => setIsCreateModalOpen(false);
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOrder, setSortOrder] = useState<string>("recent");
@@ -96,13 +92,7 @@ export default function Home() {
             </Button>
           </div>
           
-          <Button 
-            onClick={openCreateModal}
-            className="md:hidden"
-            size="sm"
-          >
-            New
-          </Button>
+          <AddSnippetDialog />
         </div>
       </div>
       
@@ -112,13 +102,6 @@ export default function Home() {
         isLoading={isLoading} 
         error={error}
         viewMode={viewMode}
-      />
-      
-      {/* Create/Edit Snippet Modal */}
-      <CreateSnippetModal 
-        isOpen={isCreateModalOpen}
-        onClose={closeCreateModal}
-        isEditMode={false}
       />
     </Layout>
   );
