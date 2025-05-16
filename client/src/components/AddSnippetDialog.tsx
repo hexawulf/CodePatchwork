@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
@@ -130,6 +131,9 @@ export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }:
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Create New Snippet</DialogTitle>
+          <DialogDescription>
+            Add a new code snippet to your collection
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
