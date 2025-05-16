@@ -4,6 +4,7 @@ import {
   collections, type Collection, type InsertCollection,
   collectionItems, type CollectionItem, type InsertCollectionItem
 } from "@shared/schema";
+import { eq, and, or, isNotNull, ilike, sql } from "drizzle-orm";
 
 // Modify the interface with any CRUD methods needed
 export interface IStorage {
@@ -295,52 +296,52 @@ const DarkModeToggle = () => {
         code: `package main
 
 import (
-	"errors"
-	"fmt"
+        "errors"
+        "fmt"
 )
 
 // Define custom error types
 type NotFoundError struct {
-	ID string
+        ID string
 }
 
 func (e *NotFoundError) Error() string {
-	return fmt.Sprintf("entity with ID %s not found", e.ID)
+        return fmt.Sprintf("entity with ID %s not found", e.ID)
 }
 
 // Function that returns different error types
 func GetUser(id string) (User, error) {
-	// Simulate user not found
-	if id == "" {
-		return User{}, &NotFoundError{ID: id}
-	}
-	
-	// Simulate another error
-	if id == "invalid" {
-		return User{}, errors.New("invalid user ID format")
-	}
-	
-	// Success
-	return User{ID: id, Name: "John Doe"}, nil
+        // Simulate user not found
+        if id == "" {
+                return User{}, &NotFoundError{ID: id}
+        }
+        
+        // Simulate another error
+        if id == "invalid" {
+                return User{}, errors.New("invalid user ID format")
+        }
+        
+        // Success
+        return User{ID: id, Name: "John Doe"}, nil
 }
 
 // Error handling pattern with type checking
 func main() {
-	user, err := GetUser("")
-	if err != nil {
-		// Check specific error type
-		if notFoundErr, ok := err.(*NotFoundError); ok {
-			fmt.Printf("Could not find user: %v\\n", notFoundErr)
-			// Handle not found case
-		} else {
-			fmt.Printf("Error getting user: %v\\n", err)
-			// Handle other errors
-		}
-		return
-	}
-	
-	// Process the user
-	fmt.Printf("Found user: %s\\n", user.Name)
+        user, err := GetUser("")
+        if err != nil {
+                // Check specific error type
+                if notFoundErr, ok := err.(*NotFoundError); ok {
+                        fmt.Printf("Could not find user: %v\\n", notFoundErr)
+                        // Handle not found case
+                } else {
+                        fmt.Printf("Error getting user: %v\\n", err)
+                        // Handle other errors
+                }
+                return
+        }
+        
+        // Process the user
+        fmt.Printf("Found user: %s\\n", user.Name)
 }`,
         language: "go",
         tags: ["go", "error-handling", "best-practices"],
@@ -684,4 +685,338 @@ func main() {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const { db } = await import('./db');
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const { db } = await import('./db');
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const { db } = await import('./db');
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async getSnippets(filters?: {
+    search?: string;
+    language?: string;
+    tag?: string;
+  }): Promise<Snippet[]> {
+    const { db } = await import('./db');
+    let query = db.select().from(snippets);
+    
+    if (filters) {
+      if (filters.language) {
+        query = query.where(eq(snippets.language, filters.language));
+      }
+      
+      if (filters.search) {
+        query = query.where(
+          or(
+            ilike(snippets.title, `%${filters.search}%`),
+            ilike(snippets.description || '', `%${filters.search}%`),
+            ilike(snippets.code, `%${filters.search}%`)
+          )
+        );
+      }
+      
+      if (filters.tag) {
+        // PostgreSQL array contains operator
+        query = query.where(
+          sql`${snippets.tags} @> ARRAY[${filters.tag}]::text[]`
+        );
+      }
+    }
+    
+    return await query;
+  }
+
+  async getSnippet(id: number): Promise<Snippet | undefined> {
+    const { db } = await import('./db');
+    const result = await db.select().from(snippets).where(eq(snippets.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createSnippet(snippet: InsertSnippet): Promise<Snippet> {
+    const { db } = await import('./db');
+    const now = new Date();
+    const snippetWithDefaults = {
+      ...snippet,
+      createdAt: now,
+      updatedAt: now,
+      viewCount: snippet.viewCount || 0,
+      isFavorite: snippet.isFavorite || false
+    };
+    
+    const result = await db.insert(snippets).values(snippetWithDefaults).returning();
+    return result[0];
+  }
+
+  async updateSnippet(id: number, snippet: InsertSnippet): Promise<Snippet> {
+    const { db } = await import('./db');
+    const existingSnippet = await this.getSnippet(id);
+    
+    if (!existingSnippet) {
+      throw new Error(`Snippet with id ${id} not found`);
+    }
+    
+    const result = await db
+      .update(snippets)
+      .set({
+        ...snippet,
+        updatedAt: new Date()
+      })
+      .where(eq(snippets.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
+  async deleteSnippet(id: number): Promise<void> {
+    const { db } = await import('./db');
+    const existingSnippet = await this.getSnippet(id);
+    
+    if (!existingSnippet) {
+      throw new Error(`Snippet with id ${id} not found`);
+    }
+    
+    // First delete all collection items that reference this snippet
+    await db
+      .delete(collectionItems)
+      .where(eq(collectionItems.snippetId, id));
+    
+    // Then delete the snippet
+    await db
+      .delete(snippets)
+      .where(eq(snippets.id, id));
+  }
+
+  async incrementSnippetViewCount(id: number): Promise<void> {
+    const { db } = await import('./db');
+    const existingSnippet = await this.getSnippet(id);
+    
+    if (!existingSnippet) {
+      throw new Error(`Snippet with id ${id} not found`);
+    }
+    
+    await db
+      .update(snippets)
+      .set({
+        viewCount: sql`${snippets.viewCount} + 1`
+      })
+      .where(eq(snippets.id, id));
+  }
+
+  async toggleSnippetFavorite(id: number): Promise<Snippet> {
+    const { db } = await import('./db');
+    const existingSnippet = await this.getSnippet(id);
+    
+    if (!existingSnippet) {
+      throw new Error(`Snippet with id ${id} not found`);
+    }
+    
+    const result = await db
+      .update(snippets)
+      .set({
+        isFavorite: !existingSnippet.isFavorite
+      })
+      .where(eq(snippets.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
+  async getLanguages(): Promise<string[]> {
+    const { db } = await import('./db');
+    const result = await db
+      .selectDistinct({ language: snippets.language })
+      .from(snippets);
+    
+    return result.map(r => r.language);
+  }
+
+  async getTags(): Promise<string[]> {
+    const { db } = await import('./db');
+    // Extract unique tags from the tags array column
+    const allTags = await db
+      .select({ tags: snippets.tags })
+      .from(snippets)
+      .where(isNotNull(snippets.tags));
+    
+    // Flatten and get unique tags
+    const uniqueTags = new Set<string>();
+    allTags.forEach(row => {
+      if (row.tags) {
+        row.tags.forEach(tag => uniqueTags.add(tag));
+      }
+    });
+    
+    return Array.from(uniqueTags);
+  }
+
+  async getCollections(): Promise<Collection[]> {
+    const { db } = await import('./db');
+    return await db.select().from(collections);
+  }
+
+  async getCollection(id: number): Promise<Collection | undefined> {
+    const { db } = await import('./db');
+    const result = await db.select().from(collections).where(eq(collections.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const { db } = await import('./db');
+    const now = new Date();
+    const collectionWithDefaults = {
+      ...collection,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    const result = await db.insert(collections).values(collectionWithDefaults).returning();
+    return result[0];
+  }
+
+  async updateCollection(id: number, collection: InsertCollection): Promise<Collection> {
+    const { db } = await import('./db');
+    const existingCollection = await this.getCollection(id);
+    
+    if (!existingCollection) {
+      throw new Error(`Collection with id ${id} not found`);
+    }
+    
+    const result = await db
+      .update(collections)
+      .set({
+        ...collection,
+        updatedAt: new Date()
+      })
+      .where(eq(collections.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
+  async deleteCollection(id: number): Promise<void> {
+    const { db } = await import('./db');
+    const existingCollection = await this.getCollection(id);
+    
+    if (!existingCollection) {
+      throw new Error(`Collection with id ${id} not found`);
+    }
+    
+    // First delete all collection items that reference this collection
+    await db
+      .delete(collectionItems)
+      .where(eq(collectionItems.collectionId, id));
+    
+    // Then delete the collection
+    await db
+      .delete(collections)
+      .where(eq(collections.id, id));
+  }
+
+  async getCollectionSnippets(collectionId: number): Promise<Snippet[]> {
+    const { db } = await import('./db');
+    const existingCollection = await this.getCollection(collectionId);
+    
+    if (!existingCollection) {
+      throw new Error(`Collection with id ${collectionId} not found`);
+    }
+    
+    const result = await db
+      .select()
+      .from(snippets)
+      .innerJoin(collectionItems, eq(snippets.id, collectionItems.snippetId))
+      .where(eq(collectionItems.collectionId, collectionId));
+    
+    return result.map(row => ({
+      ...row.snippets
+    }));
+  }
+
+  async addSnippetToCollection(collectionItem: InsertCollectionItem): Promise<CollectionItem> {
+    const { db } = await import('./db');
+    
+    // Check if collection exists
+    const existingCollection = await this.getCollection(collectionItem.collectionId);
+    if (!existingCollection) {
+      throw new Error(`Collection with id ${collectionItem.collectionId} not found`);
+    }
+    
+    // Check if snippet exists
+    const existingSnippet = await this.getSnippet(collectionItem.snippetId);
+    if (!existingSnippet) {
+      throw new Error(`Snippet with id ${collectionItem.snippetId} not found`);
+    }
+    
+    // Check if the snippet is already in the collection
+    const existing = await db
+      .select()
+      .from(collectionItems)
+      .where(
+        and(
+          eq(collectionItems.collectionId, collectionItem.collectionId),
+          eq(collectionItems.snippetId, collectionItem.snippetId)
+        )
+      )
+      .limit(1);
+    
+    if (existing.length > 0) {
+      throw new Error(`Snippet is already in the collection`);
+    }
+    
+    const now = new Date();
+    const itemWithDefaults = {
+      ...collectionItem,
+      createdAt: now
+    };
+    
+    const result = await db
+      .insert(collectionItems)
+      .values(itemWithDefaults)
+      .returning();
+    
+    return result[0];
+  }
+
+  async removeSnippetFromCollection(collectionId: number, snippetId: number): Promise<void> {
+    const { db } = await import('./db');
+    
+    // Check if the item exists
+    const existing = await db
+      .select()
+      .from(collectionItems)
+      .where(
+        and(
+          eq(collectionItems.collectionId, collectionId),
+          eq(collectionItems.snippetId, snippetId)
+        )
+      )
+      .limit(1);
+    
+    if (existing.length === 0) {
+      throw new Error(`Snippet is not in the collection`);
+    }
+    
+    await db
+      .delete(collectionItems)
+      .where(
+        and(
+          eq(collectionItems.collectionId, collectionId),
+          eq(collectionItems.snippetId, snippetId)
+        )
+      );
+  }
+}
+
+// Create an instance of DatabaseStorage to use throughout the application
+export const storage = new DatabaseStorage();
