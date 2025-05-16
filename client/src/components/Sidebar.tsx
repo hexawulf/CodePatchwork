@@ -83,67 +83,67 @@ export default function Sidebar({ className, onClose }: SidebarProps) {
         <ul>
           <li className="mb-1">
             <Link href="/">
-              <a className={cn(
-                "flex items-center px-2 py-2 text-sm rounded-md font-medium",
+              <div className={cn(
+                "flex items-center px-2 py-2 text-sm rounded-md font-medium cursor-pointer",
                 location === "/" 
                   ? "bg-primary-50 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300" 
                   : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               )}>
                 <Home className="h-5 w-5 mr-2" />
                 Home
-              </a>
+              </div>
             </Link>
           </li>
           <li className="mb-1">
             <Link href="/snippets">
-              <a className={cn(
-                "flex items-center px-2 py-2 text-sm rounded-md font-medium",
+              <div className={cn(
+                "flex items-center px-2 py-2 text-sm rounded-md font-medium cursor-pointer",
                 location === "/snippets" 
                   ? "bg-primary-50 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300" 
                   : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               )}>
                 <FileText className="h-5 w-5 mr-2" />
                 My Snippets
-              </a>
+              </div>
             </Link>
           </li>
           <li className="mb-1">
             <Link href="/collections">
-              <a className={cn(
-                "flex items-center px-2 py-2 text-sm rounded-md font-medium",
+              <div className={cn(
+                "flex items-center px-2 py-2 text-sm rounded-md font-medium cursor-pointer",
                 location === "/collections" 
                   ? "bg-primary-50 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300" 
                   : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               )}>
                 <FolderOpen className="h-5 w-5 mr-2" />
                 Collections
-              </a>
+              </div>
             </Link>
           </li>
           <li className="mb-1">
             <Link href="/tags">
-              <a className={cn(
-                "flex items-center px-2 py-2 text-sm rounded-md font-medium",
+              <div className={cn(
+                "flex items-center px-2 py-2 text-sm rounded-md font-medium cursor-pointer",
                 location === "/tags" 
                   ? "bg-primary-50 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300" 
                   : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               )}>
                 <Tag className="h-5 w-5 mr-2" />
                 Tags
-              </a>
+              </div>
             </Link>
           </li>
           <li className="mb-1">
             <Link href="/settings">
-              <a className={cn(
-                "flex items-center px-2 py-2 text-sm rounded-md font-medium",
+              <div className={cn(
+                "flex items-center px-2 py-2 text-sm rounded-md font-medium cursor-pointer",
                 location === "/settings" 
                   ? "bg-primary-50 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300" 
                   : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               )}>
                 <Settings className="h-5 w-5 mr-2" />
                 Settings
-              </a>
+              </div>
             </Link>
           </li>
         </ul>
@@ -174,9 +174,9 @@ export default function Sidebar({ className, onClose }: SidebarProps) {
             {languages.length > 5 && (
               <li>
                 <Link href="/languages">
-                  <a className="flex items-center px-2 py-1.5 text-sm rounded-md text-primary-600 dark:text-primary-400 hover:underline">
+                  <div className="flex items-center px-2 py-1.5 text-sm rounded-md text-primary-600 dark:text-primary-400 hover:underline cursor-pointer">
                     Show all ({languages.length})
-                  </a>
+                  </div>
                 </Link>
               </li>
             )}
@@ -203,9 +203,9 @@ export default function Sidebar({ className, onClose }: SidebarProps) {
             
             {tags.length > 5 && (
               <Link href="/tags">
-                <a className="text-xs py-1 px-2 bg-primary-100 dark:bg-primary-900/50 rounded-full text-primary-700 dark:text-primary-300">
+                <div className="text-xs py-1 px-2 bg-primary-100 dark:bg-primary-900/50 rounded-full text-primary-700 dark:text-primary-300 cursor-pointer">
                   +{tags.length - 5} more
-                </a>
+                </div>
               </Link>
             )}
           </div>
