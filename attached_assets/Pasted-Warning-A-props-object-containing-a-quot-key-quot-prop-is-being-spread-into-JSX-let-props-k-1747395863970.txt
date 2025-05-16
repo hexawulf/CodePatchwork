@@ -1,0 +1,31 @@
+Warning: A props object containing a &quot;key&quot; prop is being spread into JSX:
+  let props = {key: someKey, data-replit-metadata: ..., data-component-name: ..., className: ..., style: ..., children: ...};
+  &lt;div {...props} /&gt;
+React keys must be passed directly to JSX without using spread:
+  let props = {data-replit-metadata: ..., data-component-name: ..., className: ..., style: ..., children: ...};
+  &lt;div key={someKey} {...props} /&gt;
+    at Highlight (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/prism-react-renderer.js?v=9c312775:3048:3)
+    at Highlight2 (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/prism-react-renderer.js?v=9c312775:3069:16)
+    at CodeBlock (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/src/components/CodeBlock.tsx:18:37)
+    at div
+    at div
+    at div
+    at div
+    at SnippetCard (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/src/components/SnippetCard.tsx:41:39)
+    at div
+    at SnippetGrid (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/src/components/SnippetGrid.tsx:21:39)
+    at main
+    at div
+    at div
+    at Layout (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/src/components/Layout.tsx:21:34)
+    at Home (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/src/pages/Home.tsx?t=1747395184887:34:53)
+    at Route (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=9c312775:323:16)
+    at Switch (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=9c312775:379:17)
+    at Router
+    at Provider (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-M3NVYRND.js?v=9c312775:48:15)
+    at TooltipProvider (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=9c312775:59:5)
+    at SnippetProvider (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/src/contexts/SnippetContext.tsx:23:35)
+    at ThemeProvider (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/src/contexts/ThemeContext.tsx:20:33)
+    at QueryClientProvider (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=9c312775:2805:3)
+    at App (https://748ca40c-adc5-4420-89fe-05eb662dff30-00-11ru6qi5mmdfw.kirk.replit.dev/src/App.tsx?t=1747395184887&v=p7g-H5Whj_I7LT94YrutN:73:3)
+Open create modal clicked
