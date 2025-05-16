@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Star, Copy, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CodeBlock from "./CodeBlock";
+import { useSnippetContext } from "@/contexts/SnippetContext";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -30,20 +31,8 @@ interface SnippetCardProps {
 }
 
 export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
-  // Temporarily use direct functions instead of context
-  const openEditModal = (snippet: Snippet) => {
-    console.log("Edit modal opened for snippet:", snippet.id);
-  };
-  
-  const toggleFavorite = async (id: number) => {
-    console.log("Toggle favorite for snippet:", id);
-    return Promise.resolve();
-  };
-  
-  const deleteSnippet = async (id: number) => {
-    console.log("Delete snippet:", id);
-    return Promise.resolve();
-  };
+  // Use the context for all operations
+  const { openEditModal, toggleFavorite, deleteSnippet } = useSnippetContext();
   const { toast } = useToast();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   
