@@ -1,0 +1,70 @@
+CodeCanvas Project Creation Prompt
+I want to create a web application called CodeCanvas - a visual code snippet manager with a Pinterest-style interface that allows developers to store, organize, and retrieve code snippets in a visually engaging way.
+Project Overview
+CodeCanvas aims to transform how developers manage code snippets by replacing scattered text files and notes with a visually appealing, searchable repository. Think of it as "Pinterest meets GitHub Gists" with a focus on visual organization and discoverability.
+Technical Requirements
+
+Frontend: React 18 with functional components and hooks
+Styling: TailwindCSS with a custom color scheme that supports light/dark mode
+Code Highlighting: Prism.js supporting at least 10 popular programming languages
+State Management: React Context API for application state
+Layout System: Masonry grid layout (Pinterest-style) for snippet display
+Backend: Node.js + Express with RESTful API endpoints
+Database: MongoDB with Mongoose ODM
+Authentication: JWT-based (optional but preferred)
+
+Core Features to Implement
+
+Snippet Management:
+
+Create, edit, and delete snippets
+Each snippet includes title, description (markdown), code content, language, and tags
+Copy snippet to clipboard with one click
+
+
+Visual Organization:
+
+Responsive masonry grid layout for snippet cards
+Color coding by programming language
+Collections to group related snippets
+
+
+Search & Discovery:
+
+Full-text search across title, description, and code
+Filter by language, tags, and date
+Sort by various criteria
+Tag cloud for quick navigation
+
+
+User Experience:
+
+Light/dark theme toggle that respects system preferences
+Responsive design that works on mobile, tablet, and desktop
+Syntax highlighting for 10+ programming languages
+
+
+
+Project Structure
+Please help me structure the codebase with clean separation of concerns:
+
+/client directory for the React frontend
+
+/components for React components
+/contexts for Context API state management
+/services for API calls
+/utils for helper functions
+/styles for any custom CSS beyond Tailwind
+
+
+/server directory for the Node.js/Express backend
+
+/routes for API endpoints
+/controllers for business logic
+/models for MongoDB schemas
+/middleware for request processing
+
+
+
+Implementation Approach
+I'd like to follow the implementation plan outlined in the attached markdown document, starting with the UI components first, then integrating the backend functionality
