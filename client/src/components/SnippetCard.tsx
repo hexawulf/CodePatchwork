@@ -57,13 +57,29 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
     return colors[language.toLowerCase()] || "#718096";
   };
   
+  // States for copy feedback
+  const [isCopying, setIsCopying] = useState(false);
+  
   // Function to copy code to clipboard
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(snippet.code);
-    toast({
-      title: "Code copied!",
-      description: "The code snippet has been copied to your clipboard.",
-    });
+  const copyToClipboard = async () => {
+    try {
+      setIsCopying(true);
+      await navigator.clipboard.writeText(snippet.code);
+      toast({
+        title: "Code copied!",
+        description: "The code snippet has been copied to your clipboard.",
+      });
+    } catch (error) {
+      console.error("Failed to copy:", error);
+      toast({
+        title: "Copy failed",
+        description: "Could not copy to clipboard. Try again or use the edit mode to select and copy manually.",
+        variant: "destructive",
+      });
+    } finally {
+      // Show brief visual feedback
+      setTimeout(() => setIsCopying(false), 1000);
+    }
   };
   
   // Function to handle favorite toggle
@@ -128,6 +144,10 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={copyToClipboard}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy code
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleEdit}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Edit
@@ -176,11 +196,12 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
             ></span>
             <span className="text-slate-700 dark:text-slate-300">{snippet.language}</span>
             <button 
-              className="ml-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" 
+              className={`ml-2 ${isCopying ? 'text-green-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               aria-label="Copy code"
               onClick={copyToClipboard}
+              disabled={isCopying}
             >
-              <Copy className="h-4 w-4" />
+              <Copy className={`h-4 w-4 ${isCopying ? 'animate-ping' : ''}`} />
             </button>
           </div>
           
@@ -194,11 +215,12 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
         <div className="hidden md:block md:w-2/3 p-4 relative overflow-hidden">
           <div className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-700 rounded-bl text-xs px-2 py-0.5 flex items-center">
             <button 
-              className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" 
+              className={`${isCopying ? 'text-green-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               aria-label="Copy code"
               onClick={copyToClipboard}
+              disabled={isCopying}
             >
-              <Copy className="h-4 w-4" />
+              <Copy className={`h-4 w-4 ${isCopying ? 'animate-ping' : ''}`} />
             </button>
           </div>
           
