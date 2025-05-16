@@ -116,7 +116,11 @@ export default function Snippets() {
       />
       
       {/* Create/Edit Snippet Modal */}
-      {<CreateSnippetModal />}
+      <CreateSnippetModal 
+        isOpen={isCreateModalOpen}
+        onClose={closeCreateModal}
+        isEditMode={false}
+      />
     </Layout>
   );
 }
