@@ -3,12 +3,20 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
+import Snippets from "@/pages/Snippets";
+import Collections from "@/pages/Collections";
+import Tags from "@/pages/Tags";
+import Settings from "@/pages/Settings";
 import { useEffect } from "react";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/snippets" component={Snippets} />
+      <Route path="/collections" component={Collections} />
+      <Route path="/tags" component={Tags} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
