@@ -1,11 +1,8 @@
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
-import CreateSnippetModal from "@/components/CreateSnippetModal";
-import { useSnippetContext } from "@/contexts/SnippetContext";
-import { useSnippets } from "@/hooks/useSnippets";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Settings, Grid3X3, List } from "lucide-react";
+import { Grid3X3, List } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,11 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useSnippets } from "@/hooks/useSnippets";
 
-export default function Home() {
-  // Temporarily remove context dependency for debugging
+export default function Snippets() {
+  // Temporary local state for component
   const isCreateModalOpen = false;
-  const openCreateModal = () => {};
+  const openCreateModal = () => {
+    console.log("Open create modal clicked");
+  };
   const searchTerm = "";
   const activeLanguage = null;
   const activeTag = null;
@@ -54,9 +54,9 @@ export default function Home() {
       {/* Page Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Snippets</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">All Snippets</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Collect, organize, and discover code snippets
+            Browse and organize your code snippets
           </p>
         </div>
         <div className="mt-4 sm:mt-0 flex flex-wrap gap-2">
@@ -112,9 +112,6 @@ export default function Home() {
         error={error}
         viewMode={viewMode}
       />
-      
-      {/* Create Snippet Modal */}
-      {isCreateModalOpen && <CreateSnippetModal />}
     </Layout>
   );
 }
