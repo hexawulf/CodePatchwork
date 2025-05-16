@@ -1,8 +1,9 @@
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
+import CreateSnippetModal from "@/components/CreateSnippetModal";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Grid3X3, List } from "lucide-react";
+import { Grid3X3, List, Plus } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,16 +12,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSnippets } from "@/hooks/useSnippets";
+import { useSnippetContext } from "@/contexts/SnippetContext";
 
 export default function Snippets() {
-  // Temporary local state for component
-  const isCreateModalOpen = false;
-  const openCreateModal = () => {
-    console.log("Open create modal clicked");
-  };
-  const searchTerm = "";
-  const activeLanguage = null;
-  const activeTag = null;
+  // Use context for global state
+  const { 
+    isCreateModalOpen, 
+    openCreateModal,
+    searchTerm, 
+    activeLanguage, 
+    activeTag 
+  } = useSnippetContext();
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOrder, setSortOrder] = useState<string>("recent");
@@ -97,10 +99,11 @@ export default function Snippets() {
           
           <Button 
             onClick={openCreateModal}
-            className="md:hidden"
             size="sm"
+            className="flex items-center"
           >
-            New
+            <Plus className="h-4 w-4 mr-1" />
+            New Snippet
           </Button>
         </div>
       </div>
@@ -112,6 +115,9 @@ export default function Snippets() {
         error={error}
         viewMode={viewMode}
       />
+      
+      {/* Create/Edit Snippet Modal */}
+      {isCreateModalOpen && <CreateSnippetModal />}
     </Layout>
   );
 }
