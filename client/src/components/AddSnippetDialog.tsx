@@ -48,19 +48,30 @@ export default function AddSnippetDialog() {
     setIsSubmitting(true);
     
     try {
-      // Create snippet with minimal fields
-      await apiRequest(
-        'POST',
-        '/api/snippets',
-        {
+      // Direct fetch API approach for better control and error handling
+      const API_URL = window.location.origin + '/api/snippets';
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
           title,
           code,
           description: description || null,
           language,
           tags: [],
           userId: null
-        }
-      );
+        }),
+        credentials: "include"
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`);
+      }
+      
+      const result = await res.json();
+      console.log("Snippet created successfully:", result);
       
       toast({
         title: "Success",
