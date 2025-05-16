@@ -23,15 +23,32 @@ import {
 } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 
-export default function AddSnippetDialog() {
+interface AddSnippetDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }: AddSnippetDialogProps = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState("javascript");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Determine if the component is controlled or uncontrolled
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  
+  const setOpen = (newOpen: boolean) => {
+    if (isControlled && onOpenChange) {
+      onOpenChange(newOpen);
+    } else {
+      setInternalOpen(newOpen);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
