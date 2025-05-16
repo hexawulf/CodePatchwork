@@ -1,0 +1,687 @@
+import { 
+  users, type User, type InsertUser,
+  snippets, type Snippet, type InsertSnippet,
+  collections, type Collection, type InsertCollection,
+  collectionItems, type CollectionItem, type InsertCollectionItem
+} from "@shared/schema";
+
+// Modify the interface with any CRUD methods needed
+export interface IStorage {
+  // User operations
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  
+  // Snippet operations
+  getSnippets(filters?: {
+    search?: string;
+    language?: string;
+    tag?: string;
+  }): Promise<Snippet[]>;
+  getSnippet(id: number): Promise<Snippet | undefined>;
+  createSnippet(snippet: InsertSnippet): Promise<Snippet>;
+  updateSnippet(id: number, snippet: InsertSnippet): Promise<Snippet>;
+  deleteSnippet(id: number): Promise<void>;
+  incrementSnippetViewCount(id: number): Promise<void>;
+  toggleSnippetFavorite(id: number): Promise<Snippet>;
+  
+  // Language and tag operations
+  getLanguages(): Promise<string[]>;
+  getTags(): Promise<string[]>;
+  
+  // Collection operations
+  getCollections(): Promise<Collection[]>;
+  getCollection(id: number): Promise<Collection | undefined>;
+  createCollection(collection: InsertCollection): Promise<Collection>;
+  updateCollection(id: number, collection: InsertCollection): Promise<Collection>;
+  deleteCollection(id: number): Promise<void>;
+  
+  // Collection items operations
+  getCollectionSnippets(collectionId: number): Promise<Snippet[]>;
+  addSnippetToCollection(collectionItem: InsertCollectionItem): Promise<CollectionItem>;
+  removeSnippetFromCollection(collectionId: number, snippetId: number): Promise<void>;
+}
+
+export class MemStorage implements IStorage {
+  private users: Map<number, User>;
+  private snippets: Map<number, Snippet>;
+  private collections: Map<number, Collection>;
+  private collectionItems: Map<number, CollectionItem>;
+  
+  private userIdCounter: number;
+  private snippetIdCounter: number;
+  private collectionIdCounter: number;
+  private collectionItemIdCounter: number;
+
+  constructor() {
+    this.users = new Map();
+    this.snippets = new Map();
+    this.collections = new Map();
+    this.collectionItems = new Map();
+    
+    this.userIdCounter = 1;
+    this.snippetIdCounter = 1;
+    this.collectionIdCounter = 1;
+    this.collectionItemIdCounter = 1;
+    
+    // Initialize with some sample data
+    this.initializeSampleData();
+  }
+
+  private initializeSampleData() {
+    // Add sample snippets
+    const sampleSnippets: InsertSnippet[] = [
+      {
+        title: "React useLocalStorage Hook",
+        description: "Custom React hook to persist state in localStorage with type safety.",
+        code: `import { useState, useEffect } from 'react';
+
+function useLocalStorage<T>(
+  key: string, 
+  initialValue: T
+): [T, (value: T) => void] {
+  // Get stored value
+  const readValue = (): T => {
+    if (typeof window === 'undefined') {
+      return initialValue;
+    }
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.warn('Error reading localStorage key', error);
+      return initialValue;
+    }
+  };
+  
+  const [storedValue, setStoredValue] = useState<T>(readValue);
+  
+  // Return a wrapped version of useState's setter
+  const setValue = (value: T) => {
+    try {
+      // Save state
+      setStoredValue(value);
+      // Save to localStorage
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.warn('Error setting localStorage key', error);
+    }
+  };
+
+  useEffect(() => {
+    setStoredValue(readValue());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return [storedValue, setValue];
+}`,
+        language: "tsx",
+        tags: ["react", "hooks", "typescript"],
+        userId: null,
+        isFavorite: false,
+        viewCount: 12
+      },
+      {
+        title: "Python Decorator for Timing",
+        description: "A simple Python decorator to measure and log function execution time.",
+        code: `import time
+import functools
+import logging
+
+def timer(func):
+    """Print the runtime of the decorated function"""
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        start_time = time.perf_counter()
+        value = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        run_time = end_time - start_time
+        logging.info(f"Completed {func.__name__!r} in {run_time:.4f} secs")
+        return value
+    return wrapper_timer
+
+# Example usage
+@timer
+def waste_some_time(num_times):
+    for _ in range(num_times):
+        sum([i**2 for i in range(10000)])
+        
+# Call it
+waste_some_time(100)`,
+        language: "python",
+        tags: ["python", "decorators", "performance"],
+        userId: null,
+        isFavorite: false,
+        viewCount: 24
+      },
+      {
+        title: "CSS Grid Layout Template",
+        description: "Responsive grid layout with areas for header, sidebar, content and footer.",
+        code: `.grid-container {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "h h h h h h h h h h h h"
+    "s s c c c c c c c c c c"
+    "f f f f f f f f f f f f";
+  min-height: 100vh;
+  gap: 1rem;
+}
+
+.header { grid-area: h; }
+.sidebar { grid-area: s; }
+.content { grid-area: c; }
+.footer { grid-area: f; }
+
+/* Tablet layout */
+@media (max-width: 992px) {
+  .grid-container {
+    grid-template-areas:
+      "h h h h h h h h h h h h"
+      "s s s s c c c c c c c c"
+      "f f f f f f f f f f f f";
+  }
+}
+
+/* Mobile layout */
+@media (max-width: 768px) {
+  .grid-container {
+    grid-template-areas:
+      "h h h h h h h h h h h h"
+      "c c c c c c c c c c c c"
+      "s s s s s s s s s s s s"
+      "f f f f f f f f f f f f";
+  }
+}`,
+        language: "css",
+        tags: ["css", "grid", "responsive"],
+        userId: null,
+        isFavorite: true,
+        viewCount: 41
+      },
+      {
+        title: "JavaScript Array Methods Cheatsheet",
+        description: "Quick reference for common JavaScript array methods with examples.",
+        code: `/* Array methods cheatsheet */
+
+// ADDING ELEMENTS
+array.push(item);          // Add to end
+array.unshift(item);       // Add to beginning
+array.splice(index, 0, item); // Add at position
+
+// REMOVING ELEMENTS
+array.pop();               // Remove from end
+array.shift();             // Remove from beginning
+array.splice(index, 1);    // Remove at position
+
+// TRANSFORMATION
+array.map(callback);       // Create new array with results
+array.filter(callback);    // Create array with elements that pass test
+array.reduce(callback, initialValue); // Reduce to single value
+array.sort(compareFunction); // Sort elements
+array.reverse();           // Reverse order
+
+// SEARCHING
+array.find(callback);      // Find first matching element
+array.findIndex(callback); // Find index of first match
+array.includes(item);      // Check if array contains item
+array.indexOf(item);       // Find index of item (-1 if not found)
+
+// ITERATION
+array.forEach(callback);   // Execute function on each element
+
+// JOINING & SPLITTING
+array.join(separator);     // Join elements into string
+string.split(separator);   // Split string into array`,
+        language: "javascript",
+        tags: ["javascript", "arrays", "cheatsheet"],
+        userId: null,
+        isFavorite: true,
+        viewCount: 137
+      },
+      {
+        title: "Tailwind Dark Mode Toggle",
+        description: "React component for toggling dark mode with system preference detection.",
+        code: `import { useState, useEffect } from 'react';
+
+const DarkModeToggle = () => {
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    // Check for system preference when component mounts
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setDarkMode(
+      localStorage.getItem('darkMode') !== null
+        ? localStorage.getItem('darkMode') === 'true'
+        : prefersDark
+    );
+  }, []);
+
+  useEffect(() => {
+    // Update document class when darkMode state changes
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('darkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('darkMode', 'false');
+    }
+  }, [darkMode]);
+
+  return (
+    <button
+      onClick={() => setDarkMode(!darkMode)}
+      className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+      aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {darkMode ? (
+        <SunIcon className="h-5 w-5" />
+      ) : (
+        <MoonIcon className="h-5 w-5" />
+      )}
+    </button>
+  );
+};`,
+        language: "jsx",
+        tags: ["react", "tailwind", "darkmode"],
+        userId: null,
+        isFavorite: false,
+        viewCount: 52
+      },
+      {
+        title: "Go Error Handling Pattern",
+        description: "Best practices for handling errors in Go with custom error types.",
+        code: `package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+// Define custom error types
+type NotFoundError struct {
+	ID string
+}
+
+func (e *NotFoundError) Error() string {
+	return fmt.Sprintf("entity with ID %s not found", e.ID)
+}
+
+// Function that returns different error types
+func GetUser(id string) (User, error) {
+	// Simulate user not found
+	if id == "" {
+		return User{}, &NotFoundError{ID: id}
+	}
+	
+	// Simulate another error
+	if id == "invalid" {
+		return User{}, errors.New("invalid user ID format")
+	}
+	
+	// Success
+	return User{ID: id, Name: "John Doe"}, nil
+}
+
+// Error handling pattern with type checking
+func main() {
+	user, err := GetUser("")
+	if err != nil {
+		// Check specific error type
+		if notFoundErr, ok := err.(*NotFoundError); ok {
+			fmt.Printf("Could not find user: %v\\n", notFoundErr)
+			// Handle not found case
+		} else {
+			fmt.Printf("Error getting user: %v\\n", err)
+			// Handle other errors
+		}
+		return
+	}
+	
+	// Process the user
+	fmt.Printf("Found user: %s\\n", user.Name)
+}`,
+        language: "go",
+        tags: ["go", "error-handling", "best-practices"],
+        userId: null,
+        isFavorite: false,
+        viewCount: 18
+      }
+    ];
+
+    // Add sample collections
+    const sampleCollections: InsertCollection[] = [
+      {
+        name: "React Patterns",
+        description: "Collection of useful React patterns and hooks",
+        userId: null
+      },
+      {
+        name: "CSS Layouts",
+        description: "Responsive CSS layout techniques",
+        userId: null
+      },
+      {
+        name: "JavaScript Essentials",
+        description: "Must-know JavaScript concepts and utilities",
+        userId: null
+      }
+    ];
+
+    // Add all sample snippets
+    sampleSnippets.forEach(snippet => {
+      this.createSnippet({
+        ...snippet,
+        viewCount: snippet.viewCount || 0,
+        isFavorite: snippet.isFavorite || false
+      });
+    });
+
+    // Add all sample collections
+    const collectionIds = sampleCollections.map(collection => 
+      this.createCollection(collection).then(c => c.id)
+    );
+
+    // Once all collections are created, add snippets to them
+    Promise.all(collectionIds).then(ids => {
+      // Add React useLocalStorage and Tailwind Dark Mode Toggle to React Patterns
+      this.addSnippetToCollection({ collectionId: ids[0], snippetId: 1 });
+      this.addSnippetToCollection({ collectionId: ids[0], snippetId: 5 });
+      
+      // Add CSS Grid Layout to CSS Layouts
+      this.addSnippetToCollection({ collectionId: ids[1], snippetId: 3 });
+      
+      // Add JavaScript Array Methods to JavaScript Essentials
+      this.addSnippetToCollection({ collectionId: ids[2], snippetId: 4 });
+    });
+  }
+
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username
+    );
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = this.userIdCounter++;
+    const user: User = { ...insertUser, id };
+    this.users.set(id, user);
+    return user;
+  }
+
+  // Snippet operations
+  async getSnippets(filters?: {
+    search?: string;
+    language?: string;
+    tag?: string;
+  }): Promise<Snippet[]> {
+    let snippets = Array.from(this.snippets.values());
+    
+    if (filters) {
+      // Filter by language
+      if (filters.language) {
+        snippets = snippets.filter(s => 
+          s.language.toLowerCase() === filters.language?.toLowerCase()
+        );
+      }
+      
+      // Filter by tag
+      if (filters.tag) {
+        snippets = snippets.filter(s => 
+          s.tags?.some(tag => tag.toLowerCase() === filters.tag?.toLowerCase())
+        );
+      }
+      
+      // Filter by search term (title, description, code)
+      if (filters.search) {
+        const searchTerm = filters.search.toLowerCase();
+        snippets = snippets.filter(s => 
+          s.title.toLowerCase().includes(searchTerm) || 
+          (s.description && s.description.toLowerCase().includes(searchTerm)) ||
+          s.code.toLowerCase().includes(searchTerm)
+        );
+      }
+    }
+    
+    // Sort by most recently updated
+    return snippets.sort((a, b) => {
+      const dateA = new Date(a.updatedAt).getTime();
+      const dateB = new Date(b.updatedAt).getTime();
+      return dateB - dateA;
+    });
+  }
+
+  async getSnippet(id: number): Promise<Snippet | undefined> {
+    return this.snippets.get(id);
+  }
+
+  async createSnippet(snippet: InsertSnippet): Promise<Snippet> {
+    const id = this.snippetIdCounter++;
+    const now = new Date();
+    
+    const newSnippet: Snippet = {
+      ...snippet,
+      id,
+      createdAt: now,
+      updatedAt: now,
+      viewCount: snippet.viewCount || 0,
+      isFavorite: snippet.isFavorite || false
+    };
+    
+    this.snippets.set(id, newSnippet);
+    return newSnippet;
+  }
+
+  async updateSnippet(id: number, snippet: InsertSnippet): Promise<Snippet> {
+    const existingSnippet = this.snippets.get(id);
+    
+    if (!existingSnippet) {
+      throw new Error(`Snippet with id ${id} not found`);
+    }
+    
+    const updatedSnippet: Snippet = {
+      ...existingSnippet,
+      ...snippet,
+      updatedAt: new Date()
+    };
+    
+    this.snippets.set(id, updatedSnippet);
+    return updatedSnippet;
+  }
+
+  async deleteSnippet(id: number): Promise<void> {
+    // Delete snippet from collections first
+    const collectionItemsToDelete = Array.from(this.collectionItems.values())
+      .filter(item => item.snippetId === id);
+    
+    for (const item of collectionItemsToDelete) {
+      this.collectionItems.delete(item.id);
+    }
+    
+    // Delete the snippet
+    this.snippets.delete(id);
+  }
+
+  async incrementSnippetViewCount(id: number): Promise<void> {
+    const snippet = this.snippets.get(id);
+    
+    if (snippet) {
+      const updatedSnippet = {
+        ...snippet,
+        viewCount: snippet.viewCount + 1
+      };
+      
+      this.snippets.set(id, updatedSnippet);
+    }
+  }
+
+  async toggleSnippetFavorite(id: number): Promise<Snippet> {
+    const snippet = this.snippets.get(id);
+    
+    if (!snippet) {
+      throw new Error(`Snippet with id ${id} not found`);
+    }
+    
+    const updatedSnippet = {
+      ...snippet,
+      isFavorite: !snippet.isFavorite
+    };
+    
+    this.snippets.set(id, updatedSnippet);
+    return updatedSnippet;
+  }
+
+  // Language and tag operations
+  async getLanguages(): Promise<string[]> {
+    const languages = new Set<string>();
+    
+    for (const snippet of this.snippets.values()) {
+      languages.add(snippet.language);
+    }
+    
+    return Array.from(languages).sort();
+  }
+
+  async getTags(): Promise<string[]> {
+    const tags = new Set<string>();
+    
+    for (const snippet of this.snippets.values()) {
+      if (snippet.tags) {
+        for (const tag of snippet.tags) {
+          tags.add(tag);
+        }
+      }
+    }
+    
+    return Array.from(tags).sort();
+  }
+
+  // Collection operations
+  async getCollections(): Promise<Collection[]> {
+    return Array.from(this.collections.values());
+  }
+
+  async getCollection(id: number): Promise<Collection | undefined> {
+    return this.collections.get(id);
+  }
+
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const id = this.collectionIdCounter++;
+    const now = new Date();
+    
+    const newCollection: Collection = {
+      ...collection,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.collections.set(id, newCollection);
+    return newCollection;
+  }
+
+  async updateCollection(id: number, collection: InsertCollection): Promise<Collection> {
+    const existingCollection = this.collections.get(id);
+    
+    if (!existingCollection) {
+      throw new Error(`Collection with id ${id} not found`);
+    }
+    
+    const updatedCollection: Collection = {
+      ...existingCollection,
+      ...collection,
+      updatedAt: new Date()
+    };
+    
+    this.collections.set(id, updatedCollection);
+    return updatedCollection;
+  }
+
+  async deleteCollection(id: number): Promise<void> {
+    // Delete all collection items first
+    const collectionItemsToDelete = Array.from(this.collectionItems.values())
+      .filter(item => item.collectionId === id);
+    
+    for (const item of collectionItemsToDelete) {
+      this.collectionItems.delete(item.id);
+    }
+    
+    // Delete the collection
+    this.collections.delete(id);
+  }
+
+  // Collection items operations
+  async getCollectionSnippets(collectionId: number): Promise<Snippet[]> {
+    // Find all collection items for this collection
+    const items = Array.from(this.collectionItems.values())
+      .filter(item => item.collectionId === collectionId);
+    
+    // Get the snippets for these items
+    const snippets: Snippet[] = [];
+    
+    for (const item of items) {
+      const snippet = this.snippets.get(item.snippetId);
+      if (snippet) {
+        snippets.push(snippet);
+      }
+    }
+    
+    return snippets;
+  }
+
+  async addSnippetToCollection(collectionItem: InsertCollectionItem): Promise<CollectionItem> {
+    // Check if snippet and collection exist
+    const snippet = this.snippets.get(collectionItem.snippetId);
+    const collection = this.collections.get(collectionItem.collectionId);
+    
+    if (!snippet) {
+      throw new Error(`Snippet with id ${collectionItem.snippetId} not found`);
+    }
+    
+    if (!collection) {
+      throw new Error(`Collection with id ${collectionItem.collectionId} not found`);
+    }
+    
+    // Check if snippet is already in collection
+    const existingItem = Array.from(this.collectionItems.values()).find(
+      item => item.collectionId === collectionItem.collectionId && 
+              item.snippetId === collectionItem.snippetId
+    );
+    
+    if (existingItem) {
+      return existingItem;
+    }
+    
+    // Add to collection
+    const id = this.collectionItemIdCounter++;
+    const now = new Date();
+    
+    const newItem: CollectionItem = {
+      ...collectionItem,
+      id,
+      createdAt: now
+    };
+    
+    this.collectionItems.set(id, newItem);
+    return newItem;
+  }
+
+  async removeSnippetFromCollection(collectionId: number, snippetId: number): Promise<void> {
+    // Find the collection item
+    const item = Array.from(this.collectionItems.values()).find(
+      item => item.collectionId === collectionId && item.snippetId === snippetId
+    );
+    
+    if (item) {
+      this.collectionItems.delete(item.id);
+    }
+  }
+}
+
+export const storage = new MemStorage();
