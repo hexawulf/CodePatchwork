@@ -12,17 +12,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSnippets } from "@/hooks/useSnippets";
-import { useSnippetContext } from "@/contexts/SnippetContext";
 
 export default function Snippets() {
-  // Use context for global state
-  const { 
-    isCreateModalOpen, 
-    openCreateModal,
-    searchTerm, 
-    activeLanguage, 
-    activeTag 
-  } = useSnippetContext();
+  // Use local state for now until context issues are resolved
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeLanguage, setActiveLanguage] = useState<string | null>(null);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  
+  const openCreateModal = () => setIsCreateModalOpen(true);
+  const closeCreateModal = () => setIsCreateModalOpen(false);
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOrder, setSortOrder] = useState<string>("recent");
@@ -117,7 +116,7 @@ export default function Snippets() {
       />
       
       {/* Create/Edit Snippet Modal */}
-      {isCreateModalOpen && <CreateSnippetModal />}
+      {<CreateSnippetModal />}
     </Layout>
   );
 }
