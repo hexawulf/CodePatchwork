@@ -1019,4 +1019,5 @@ export class DatabaseStorage implements IStorage {
 }
 
 // Create an instance of DatabaseStorage to use throughout the application
-export const storage = new DatabaseStorage();
+// Using in-memory storage for now until database issues are resolved
+export const storage = new MemStorage();
