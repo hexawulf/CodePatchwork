@@ -20,7 +20,10 @@ export default function Snippets() {
   const [activeLanguage, setActiveLanguage] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateModal = () => {
+    console.log("Open create modal clicked in Snippets page");
+    setIsCreateModalOpen(true);
+  };
   const closeCreateModal = () => setIsCreateModalOpen(false);
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
