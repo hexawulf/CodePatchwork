@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSnippetContext } from "@/contexts/SnippetContext";
+import { type Snippet } from "@shared/schema";
 import { LANGUAGES } from "@/lib/constants";
 import {
   Dialog,
@@ -27,11 +29,19 @@ import { Plus } from "lucide-react";
 interface AddSnippetDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  snippetToEdit?: Snippet | null;
+  isEditMode?: boolean;
 }
 
-export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }: AddSnippetDialogProps = {}) {
+export default function AddSnippetDialog({ 
+  open: controlledOpen, 
+  onOpenChange, 
+  snippetToEdit = null,
+  isEditMode = false
+}: AddSnippetDialogProps = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // Remove useSnippetContext for now since we're using direct API calls
   const [internalOpen, setInternalOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
@@ -50,6 +60,16 @@ export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }:
       setInternalOpen(newOpen);
     }
   };
+  
+  // Set form values when snippetToEdit changes
+  useEffect(() => {
+    if (snippetToEdit) {
+      setTitle(snippetToEdit.title);
+      setCode(snippetToEdit.code);
+      setDescription(snippetToEdit.description || "");
+      setLanguage(snippetToEdit.language);
+    }
+  }, [snippetToEdit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,21 +86,27 @@ export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }:
     setIsSubmitting(true);
     
     try {
-      // Direct fetch API approach for better control and error handling
-      const API_URL = window.location.origin + '/api/snippets';
+      const snippet = {
+        title,
+        code,
+        description: description || null,
+        language,
+        tags: snippetToEdit?.tags || [],
+        userId: null
+      };
+      
+      // Determine if we're creating or updating
+      const isEditing = isEditMode && snippetToEdit;
+      const API_URL = window.location.origin + (isEditing 
+        ? `/api/snippets/${snippetToEdit.id}` 
+        : '/api/snippets');
+        
       const res = await fetch(API_URL, {
-        method: 'POST',
+        method: isEditing ? 'PUT' : 'POST',
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          title,
-          code,
-          description: description || null,
-          language,
-          tags: [],
-          userId: null
-        }),
+        body: JSON.stringify(snippet),
         credentials: "include"
       });
       
@@ -89,11 +115,11 @@ export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }:
       }
       
       const result = await res.json();
-      console.log("Snippet created successfully:", result);
+      console.log(isEditing ? "Snippet updated successfully:" : "Snippet created successfully:", result);
       
       toast({
         title: "Success",
-        description: "Snippet created successfully",
+        description: isEditing ? "Snippet updated successfully" : "Snippet created successfully",
       });
       
       // Reset form and close modal
@@ -130,9 +156,12 @@ export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }:
       )}
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create New Snippet</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Edit Snippet' : 'Create New Snippet'}</DialogTitle>
           <DialogDescription>
-            Add a new code snippet to your collection
+            {isEditMode 
+              ? 'Update your existing code snippet'
+              : 'Add a new code snippet to your collection'
+            }
           </DialogDescription>
         </DialogHeader>
         
@@ -197,7 +226,10 @@ export default function AddSnippetDialog({ open: controlledOpen, onOpenChange }:
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Snippet"}
+              {isSubmitting 
+                ? (isEditMode ? "Updating..." : "Creating...") 
+                : (isEditMode ? "Update Snippet" : "Create Snippet")
+              }
             </Button>
           </DialogFooter>
         </form>
