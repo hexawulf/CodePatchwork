@@ -1,6 +1,5 @@
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
-import AddSnippetDialog from "@/components/AddSnippetDialog";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Grid3X3, List } from "lucide-react";
