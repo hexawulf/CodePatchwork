@@ -150,12 +150,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function signInWithGoogle(): Promise<User> {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      // Reset the provider to avoid duplicate scopes
+      const provider = new GoogleAuthProvider();
+      
+      // Add custom OAuth scopes
+      provider.addScope('profile');
+      provider.addScope('email');
+      
+      // Force account selection even if user is already signed in
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      // Use popup for mobile compatibility
+      const result = await signInWithPopup(auth, provider);
+      
+      // Log success info (for debugging)
+      console.log("Google sign in successful");
+      
       // Register with our backend
       await registerUserWithBackend(result.user);
       return result.user;
     } catch (error: any) {
-      const errorMessage = error.message || 'An error occurred during Google sign in';
+      console.error("Google sign in error:", error);
+      
+      // Provide a more user-friendly error message
+      let errorMessage = 'An error occurred during Google sign in';
+      
+      if (error.code === 'auth/popup-blocked') {
+        errorMessage = 'The sign-in popup was blocked by your browser. Please allow popups for this site.';
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'The sign-in popup was closed before completing the process.';
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        errorMessage = 'The operation was cancelled.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Google sign in failed',
         description: errorMessage,
