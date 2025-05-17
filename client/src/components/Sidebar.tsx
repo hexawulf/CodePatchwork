@@ -64,7 +64,7 @@ export default function Sidebar({ className, onClose }: SidebarProps) {
             <div className="mr-2 p-1.5 rounded-md bg-primary-500 text-white">
               <FileText className="h-5 w-5" />
             </div>
-            <h1 className="text-lg font-bold text-slate-800 dark:text-white">CodeCanvas</h1>
+            <h1 className="text-lg font-bold text-slate-800 dark:text-white">CodePatchwork</h1>
           </div>
           {onClose && (
             <button 
