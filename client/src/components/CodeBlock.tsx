@@ -25,8 +25,11 @@ export default function CodeBlock({
   code = "", 
   language = "text", 
   showLineNumbers = false,
-  theme = "nightOwl"
+  initialTheme = "nightOwl",
+  showThemeSelector = true
 }: CodeBlockProps) {
+  const [theme, setTheme] = useState<CodeTheme>(initialTheme);
+  
   // Normalize language and ensure it's supported
   let normalizedLanguage = "text";
   
@@ -60,26 +63,36 @@ export default function CodeBlock({
   
   try {
     return (
-      <Highlight 
-        theme={getThemeObject(theme)}
-        code={safeCode} 
-        language={normalizedLanguage}
-      >
-        {({ className, style, tokens, getLineProps, getTokenProps }) => (
-          <pre style={{ ...style, margin: 0, padding: '1rem', textAlign: 'left', overflow: 'auto' }} className={className}>
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line, key: i })}>
-                {showLineNumbers && <span className="opacity-50 mr-4 inline-block w-8 text-right">{i + 1}</span>}
-                {line.map((token, key) => (
-                  <span key={key} {...getTokenProps({ token, key })}>
-                    {token.content}
-                  </span>
-                ))}
-              </div>
-            ))}
-          </pre>
+      <div className="relative">
+        {showThemeSelector && (
+          <div className="absolute top-2 right-2 z-10">
+            <ThemeSelector 
+              value={theme} 
+              onChange={setTheme} 
+            />
+          </div>
         )}
-      </Highlight>
+        <Highlight 
+          theme={getThemeObject(theme)}
+          code={safeCode} 
+          language={normalizedLanguage}
+        >
+          {({ className, style, tokens, getLineProps, getTokenProps }) => (
+            <pre style={{ ...style, margin: 0, padding: '1rem', textAlign: 'left', overflow: 'auto' }} className={className}>
+              {tokens.map((line, i) => (
+                <div key={i} className={getLineProps({ line, key: i }).className} style={getLineProps({ line, key: i }).style}>
+                  {showLineNumbers && <span className="opacity-50 mr-4 inline-block w-8 text-right">{i + 1}</span>}
+                  {line.map((token, key) => (
+                    <span key={key} className={getTokenProps({ token, key }).className} style={getTokenProps({ token, key }).style}>
+                      {token.content}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </pre>
+          )}
+        </Highlight>
+      </div>
     );
   } catch (error) {
     console.error("Error rendering code block:", error);
