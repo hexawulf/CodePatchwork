@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { UploadCloud, Download, AlertCircle } from "lucide-react";
 
 interface ImportExportDialogProps {
@@ -45,9 +45,19 @@ export default function ImportExportDialog({
       const snippets = Array.isArray(snippetsData) ? snippetsData : [snippetsData];
       
       // Send to API
-      const response = await apiRequest<{message: string, snippets: any[]}>("/api/snippets/import", "POST", { 
-        snippets 
+      const response = await fetch("/api/snippets/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ snippets })
       });
+      
+      if (!response.ok) {
+        throw new Error("Failed to import snippets");
+      }
+      
+      const result = await response.json();
       
       // Refresh snippets data
       queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
@@ -55,7 +65,7 @@ export default function ImportExportDialog({
       // Show success message
       toast({
         title: "Snippets Imported",
-        description: response.message || `Successfully imported snippets.`,
+        description: result.message || `Successfully imported snippets.`,
       });
       
       // Close dialog
@@ -70,23 +80,28 @@ export default function ImportExportDialog({
   
   // Handle Export
   const handleExport = () => {
-    // Create a download link and trigger it
-    const exportUrl = "/api/snippets/export";
-    const link = document.createElement("a");
-    link.href = exportUrl;
-    link.download = "codepatchwork-snippets.json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Show success toast
-    toast({
-      title: "Snippets Exported",
-      description: "Your snippets have been exported successfully."
-    });
-    
-    // Close dialog
-    onOpenChange(false);
+    try {
+      // Create a download link and trigger it
+      const exportUrl = "/api/snippets/export";
+      const link = document.createElement("a");
+      link.href = exportUrl;
+      link.download = "codepatchwork-snippets.json";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Show success toast
+      toast({
+        title: "Snippets Exported",
+        description: "Your snippets have been exported successfully."
+      });
+      
+      // Close dialog
+      onOpenChange(false);
+    } catch (err) {
+      setError("Failed to export snippets. Please try again.");
+      console.error("Export error:", err);
+    }
   };
   
   // Reset form when dialog closes
