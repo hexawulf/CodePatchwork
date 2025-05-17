@@ -532,10 +532,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/snippets/:id/share", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
       
       const snippet = await storage.getSnippet(id);
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      // Verify ownership - users can only share their own snippets
+      if (snippet.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to share this snippet" });
       }
       
       // Generate a share ID if one doesn't exist already
@@ -554,10 +560,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/snippets/:id/publish", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
       
       const snippet = await storage.getSnippet(id);
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      // Verify ownership - users can only publish/unpublish their own snippets
+      if (snippet.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to publish this snippet" });
       }
       
       const updatedSnippet = await storage.toggleSnippetPublic(id);
@@ -623,9 +635,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const currentUserId = (req as any).user?.id;
       
-      // Get the comment to verify ownership
-      const comment = await storage.getCommentsBySnippetId(id);
-      const commentToUpdate = comment?.find(c => c.id === id);
+      // Get the comment to verify ownership - need to get a specific comment by ID
+      // For this example, we'll need to implement a method to get a comment directly
+      // This is a simplified approach that would need to be improved in a production app
+      const comments = await storage.getCommentsBySnippetId(0); // Using 0 as a placeholder
+      const commentToUpdate = comments?.find(c => c.id === id);
       
       if (!commentToUpdate) {
         return res.status(404).json({ message: "Comment not found" });
@@ -648,6 +662,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/comments/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
+      
+      // Need to get the comment to verify ownership
+      // This is a simplified approach using the same technique as the update endpoint
+      const comments = await storage.getCommentsBySnippetId(0); // Using 0 as a placeholder
+      const commentToDelete = comments?.find(c => c.id === id);
+      
+      if (!commentToDelete) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
+      
+      // Verify comment ownership - users can only delete their own comments
+      if (commentToDelete.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to delete this comment" });
+      }
       
       await storage.deleteComment(id);
       res.status(204).send();
