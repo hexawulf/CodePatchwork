@@ -11,6 +11,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 interface AuthContextProps {
   currentUser: User | null;
@@ -42,9 +43,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { toast } = useToast();
 
+  // Function to register user with our backend
+  async function registerUserWithBackend(user: User) {
+    try {
+      if (user) {
+        await fetch('/api/auth/user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL
+          })
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing user with backend:", error);
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      
+      // Register the user with our backend when they authenticate
+      if (user) {
+        registerUserWithBackend(user)
+          .catch(error => console.error("Failed to register user with backend:", error));
+      }
+      
       setIsLoading(false);
     });
 
@@ -54,6 +84,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function signUp(email: string, password: string): Promise<User> {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // Register with our backend
+      await registerUserWithBackend(userCredential.user);
       return userCredential.user;
     } catch (error: any) {
       const errorMessage = error.message || 'An error occurred during sign up';
@@ -69,6 +101,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function login(email: string, password: string): Promise<User> {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Register with our backend
+      await registerUserWithBackend(userCredential.user);
       return userCredential.user;
     } catch (error: any) {
       const errorMessage = error.message || 'An error occurred during login';
@@ -84,6 +118,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function logout(): Promise<void> {
     try {
       await signOut(auth);
+      // No need to update backend as we're checking auth state in our API
     } catch (error: any) {
       const errorMessage = error.message || 'An error occurred during logout';
       toast({
