@@ -31,7 +31,7 @@ export default function Snippets() {
   };
   const [sortOrder, setSortOrder] = useState<string>("recent");
   
-  const { snippets, isLoading, error } = useSnippets({
+  const { snippets, isLoading, error, refetch } = useSnippets({
     search: searchTerm,
     languages: activeLanguages,
     tags: activeTags,
@@ -160,6 +160,7 @@ export default function Snippets() {
           onTagChange={handleTagChange}
           onFavoriteFilter={handleFavoriteToggle}
           className="mb-2"
+          refetch={refetch}
         />
         
         <FilterBadges
