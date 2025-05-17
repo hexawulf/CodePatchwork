@@ -29,7 +29,7 @@ interface AdvancedSearchProps {
   className?: string;
 }
 
-export default function AdvancedSearch({ 
+export default function SimpleAdvancedSearch({ 
   onSearchChange, 
   onLanguageChange, 
   onTagChange, 
@@ -41,15 +41,17 @@ export default function AdvancedSearch({
   const [tags, setTags] = useState<FilterOption[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   
-  // Handle search with basic debounce
+  // Handle search with basic timeout
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
     
-    // Use setTimeout for basic debounce
-    setTimeout(() => {
+    // Simple debounce using setTimeout
+    const timeoutId = setTimeout(() => {
       onSearchChange(value);
     }, 300);
+    
+    return () => clearTimeout(timeoutId);
   };
   
   // Effect to fetch available languages
@@ -153,7 +155,7 @@ export default function AdvancedSearch({
           placeholder="Search snippets..."
           className="pl-9 bg-white dark:bg-slate-800"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearchChange}
         />
       </div>
       
