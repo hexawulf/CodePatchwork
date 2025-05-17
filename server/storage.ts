@@ -2,7 +2,8 @@ import {
   users, type User, type InsertUser,
   snippets, type Snippet, type InsertSnippet,
   collections, type Collection, type InsertCollection,
-  collectionItems, type CollectionItem, type InsertCollectionItem
+  collectionItems, type CollectionItem, type InsertCollectionItem,
+  comments, type Comment, type InsertComment
 } from "@shared/schema";
 import { eq, and, or, isNotNull, ilike, like, sql, desc, asc } from "drizzle-orm";
 
@@ -42,6 +43,17 @@ export interface IStorage {
   getCollectionSnippets(collectionId: number): Promise<Snippet[]>;
   addSnippetToCollection(collectionItem: InsertCollectionItem): Promise<CollectionItem>;
   removeSnippetFromCollection(collectionId: number, snippetId: number): Promise<void>;
+  
+  // Sharing operations
+  getSnippetByShareId(shareId: string): Promise<Snippet | undefined>;
+  generateShareId(snippetId: number): Promise<string>;
+  toggleSnippetPublic(snippetId: number): Promise<Snippet>;
+  
+  // Comment operations
+  getCommentsBySnippetId(snippetId: number): Promise<Comment[]>;
+  createComment(comment: InsertComment): Promise<Comment>;
+  updateComment(id: number, comment: Partial<InsertComment>): Promise<Comment>;
+  deleteComment(id: number): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -49,11 +61,13 @@ export class MemStorage implements IStorage {
   private snippets: Map<number, Snippet>;
   private collections: Map<number, Collection>;
   private collectionItems: Map<number, CollectionItem>;
+  private comments: Map<number, Comment>;
   
   private userIdCounter: number;
   private snippetIdCounter: number;
   private collectionIdCounter: number;
   private collectionItemIdCounter: number;
+  private commentIdCounter: number;
 
   constructor() {
     this.users = new Map();
