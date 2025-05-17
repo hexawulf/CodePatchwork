@@ -727,6 +727,98 @@ func main() {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Sharing operations
+  async getSnippetByShareId(shareId: string): Promise<Snippet | undefined> {
+    const { db } = await import('./db');
+    const result = await db.select().from(snippets).where(eq(snippets.shareId, shareId)).limit(1);
+    return result[0];
+  }
+
+  async generateShareId(snippetId: number): Promise<string> {
+    const { db } = await import('./db');
+    // Generate a random share ID (8 characters)
+    const shareId = Math.random().toString(36).substring(2, 10);
+    
+    // Update the snippet with the new share ID
+    await db
+      .update(snippets)
+      .set({ shareId })
+      .where(eq(snippets.id, snippetId));
+    
+    return shareId;
+  }
+
+  async toggleSnippetPublic(snippetId: number): Promise<Snippet> {
+    const { db } = await import('./db');
+    // First get the current snippet
+    const [currentSnippet] = await db
+      .select()
+      .from(snippets)
+      .where(eq(snippets.id, snippetId));
+    
+    if (!currentSnippet) {
+      throw new Error(`Snippet with ID ${snippetId} not found`);
+    }
+    
+    // Toggle the isPublic flag
+    const isPublic = !currentSnippet.isPublic;
+    
+    // If making public and no shareId exists, generate one
+    let shareId = currentSnippet.shareId;
+    if (isPublic && !shareId) {
+      shareId = Math.random().toString(36).substring(2, 10);
+    }
+    
+    // Update the snippet
+    const [updatedSnippet] = await db
+      .update(snippets)
+      .set({ isPublic, shareId })
+      .where(eq(snippets.id, snippetId))
+      .returning();
+    
+    return updatedSnippet;
+  }
+  
+  // Comment operations
+  async getCommentsBySnippetId(snippetId: number): Promise<Comment[]> {
+    const { db } = await import('./db');
+    return db
+      .select()
+      .from(comments)
+      .where(eq(comments.snippetId, snippetId))
+      .orderBy(asc(comments.createdAt));
+  }
+
+  async createComment(comment: InsertComment): Promise<Comment> {
+    const { db } = await import('./db');
+    const [newComment] = await db
+      .insert(comments)
+      .values(comment)
+      .returning();
+    return newComment;
+  }
+
+  async updateComment(id: number, comment: Partial<InsertComment>): Promise<Comment> {
+    const { db } = await import('./db');
+    const [updatedComment] = await db
+      .update(comments)
+      .set({ ...comment, updatedAt: new Date() })
+      .where(eq(comments.id, id))
+      .returning();
+    
+    if (!updatedComment) {
+      throw new Error(`Comment with ID ${id} not found`);
+    }
+    
+    return updatedComment;
+  }
+
+  async deleteComment(id: number): Promise<void> {
+    const { db } = await import('./db');
+    await db
+      .delete(comments)
+      .where(eq(comments.id, id));
+  }
   async getUser(id: number): Promise<User | undefined> {
     const { db } = await import('./db');
     const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
