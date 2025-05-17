@@ -166,6 +166,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import/Export endpoints
+  app.post("/api/snippets/import", async (req, res) => {
+    try {
+      const { snippets } = req.body;
+      
+      if (!Array.isArray(snippets)) {
+        return res.status(400).json({ message: "Invalid import format. Expected array of snippets." });
+      }
+      
+      const importedSnippets = [];
+      
+      for (const snippet of snippets) {
+        // Validate each snippet has required fields
+        if (!snippet.title || !snippet.code || !snippet.language) {
+          continue; // Skip invalid snippets
+        }
+        
+        const newSnippet = await storage.createSnippet({
+          title: snippet.title,
+          code: snippet.code,
+          language: snippet.language,
+          description: snippet.description || null,
+          tags: snippet.tags || null,
+          userId: null, // Set proper user ID when auth is implemented
+          isFavorite: snippet.isFavorite || false
+        });
+        
+        importedSnippets.push(newSnippet);
+      }
+      
+      res.status(201).json({ 
+        message: `Successfully imported ${importedSnippets.length} snippets`, 
+        snippets: importedSnippets 
+      });
+    } catch (error) {
+      console.error("Error importing snippets:", error);
+      res.status(500).json({ message: "Failed to import snippets" });
+    }
+  });
+  
+  app.get("/api/snippets/export", async (req, res) => {
+    try {
+      // Get all snippets or filtered ones
+      const snippets = await storage.getSnippets(req.query);
+      
+      // Format for download (could also add format options like JSON/CSV)
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
+      
+      res.json(snippets);
+    } catch (error) {
+      console.error("Error exporting snippets:", error);
+      res.status(500).json({ message: "Failed to export snippets" });
+    }
+  });
+  
   // Collections endpoints
   app.get("/api/collections", async (req, res) => {
     try {
