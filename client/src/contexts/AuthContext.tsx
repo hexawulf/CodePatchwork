@@ -7,11 +7,17 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithPopup,
-  updateProfile 
+  updateProfile,
+  GoogleAuthProvider,
+  Auth
 } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
+import { auth as firebaseAuth, googleProvider as firebaseGoogleProvider } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+
+// Type assertions to ensure TypeScript understands our imports from firebase.ts
+const auth = firebaseAuth as Auth;
+const googleProvider = firebaseGoogleProvider as GoogleAuthProvider;
 
 interface AuthContextProps {
   currentUser: User | null;
@@ -152,18 +158,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log("Starting Google sign-in process...");
       
-      // Check if Firebase is properly initialized
-      if (!auth || !googleProvider) {
-        throw new Error("Firebase authentication is not properly initialized");
+      // Ensure Firebase auth is available
+      if (!auth) {
+        throw new Error("Firebase authentication is not available");
       }
       
-      // Configure it for this specific sign-in attempt
-      googleProvider.setCustomParameters({
+      // Create a new GoogleAuthProvider instance for this sign-in attempt
+      // This ensures we have a fresh provider each time
+      const provider = new GoogleAuthProvider();
+      
+      // Add the scopes we need
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      // Set custom parameters
+      provider.setCustomParameters({
         prompt: 'select_account'
       });
       
       // Use popup for mobile compatibility
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, provider);
       
       // Log success info (for debugging)
       console.log("Google sign in successful");
