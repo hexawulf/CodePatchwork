@@ -1,38 +1,20 @@
-import { useState, useEffect } from "react";
-import { Search, Filter, X, ChevronDown } from "lucide-react";
-import { useSnippetContext } from "@/contexts/SnippetContext";
-import { Button } from "@/components/ui/button";
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
-} from "@/components/ui/popover";
+import React, { useState, useEffect } from 'react';
+import { Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger, 
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuCheckboxItem
-} from "@/components/ui/dropdown-menu";
-import { useQuery } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
-import { debounce } from "@/lib/utils";
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useDebouncedCallback } from '@/hooks/use-debounced-callback';
 
+// Define filter option type for languages and tags
 type FilterOption = {
   id: string;
   label: string;
@@ -51,238 +33,201 @@ interface AdvancedSearchProps {
 export default function AdvancedSearch({ 
   onSearchChange, 
   onLanguageChange, 
-  onTagChange,
+  onTagChange, 
   onFavoriteFilter,
   className 
 }: AdvancedSearchProps) {
-  // State for search input
-  const [inputValue, setInputValue] = useState("");
-  
-  // State for active filters
-  const [selectedLanguages, setSelectedLanguages] = useState<FilterOption[]>([]);
-  const [selectedTags, setSelectedTags] = useState<FilterOption[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [languages, setLanguages] = useState<FilterOption[]>([]);
+  const [tags, setTags] = useState<FilterOption[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   
-  // State for filter popover
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  
-  // Fetch available languages
-  const { data: languages = [] } = useQuery<string[]>({
-    queryKey: ["/api/languages"],
-    retry: 1
-  });
-  
-  // Fetch available tags
-  const { data: tags = [] } = useQuery<string[]>({
-    queryKey: ["/api/tags"],
-    retry: 1
-  });
-  
-  // Convert languages to filter options
-  useEffect(() => {
-    if (languages.length > 0) {
-      setSelectedLanguages(
-        languages.map(lang => ({
-          id: `lang-${lang}`,
-          label: lang,
-          value: lang,
-          selected: false
-        }))
-      );
-    }
-  }, [languages]);
-  
-  // Convert tags to filter options
-  useEffect(() => {
-    if (tags.length > 0) {
-      setSelectedTags(
-        tags.map(tag => ({
-          id: `tag-${tag}`,
-          label: tag,
-          value: tag,
-          selected: false
-        }))
-      );
-    }
-  }, [tags]);
-  
-  // Handle search input change with debounce
-  const handleSearchChange = debounce((value: string) => {
-    setInputValue(value);
+  // Debounce search term changes
+  const debouncedSearch = useDebouncedCallback((value: string) => {
     onSearchChange(value);
   }, 300);
   
-  // Toggle language filter
-  const toggleLanguage = (langId: string) => {
-    const updatedLanguages = selectedLanguages.map(lang => 
-      lang.id === langId ? { ...lang, selected: !lang.selected } : lang
-    );
-    setSelectedLanguages(updatedLanguages);
+  // Effect to handle search term changes
+  useEffect(() => {
+    debouncedSearch(searchTerm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+  
+  // Effect to fetch available languages
+  useEffect(() => {
+    async function fetchLanguages() {
+      try {
+        const response = await fetch('/api/languages');
+        if (!response.ok) throw new Error('Failed to fetch languages');
+        const data = await response.json();
+        
+        // Convert to filter options format
+        const languageOptions = data.map((lang: string) => ({
+          id: lang,
+          label: lang.charAt(0).toUpperCase() + lang.slice(1),
+          value: lang,
+          selected: false
+        }));
+        
+        setLanguages(languageOptions);
+      } catch (error) {
+        console.error('Error fetching languages:', error);
+      }
+    }
     
-    const activeLangs = updatedLanguages
+    fetchLanguages();
+  }, []);
+  
+  // Effect to fetch available tags
+  useEffect(() => {
+    async function fetchTags() {
+      try {
+        const response = await fetch('/api/tags');
+        if (!response.ok) throw new Error('Failed to fetch tags');
+        const data = await response.json();
+        
+        // Convert to filter options format
+        const tagOptions = data.map((tag: string) => ({
+          id: tag,
+          label: tag,
+          value: tag,
+          selected: false
+        }));
+        
+        setTags(tagOptions);
+      } catch (error) {
+        console.error('Error fetching tags:', error);
+      }
+    }
+    
+    fetchTags();
+  }, []);
+  
+  // Handle language selection changes
+  const handleLanguageChange = (languageId: string, isSelected: boolean) => {
+    const updatedLanguages = languages.map(lang => 
+      lang.id === languageId ? { ...lang, selected: isSelected } : lang
+    );
+    
+    setLanguages(updatedLanguages);
+    
+    // Pass only selected languages to parent
+    const selectedLanguages = updatedLanguages
       .filter(lang => lang.selected)
       .map(lang => lang.value);
     
-    onLanguageChange(activeLangs.length > 0 ? activeLangs : null);
+    onLanguageChange(selectedLanguages.length > 0 ? selectedLanguages : null);
   };
   
-  // Toggle tag filter
-  const toggleTag = (tagId: string) => {
-    const updatedTags = selectedTags.map(tag => 
-      tag.id === tagId ? { ...tag, selected: !tag.selected } : tag
+  // Handle tag selection changes
+  const handleTagChange = (tagId: string, isSelected: boolean) => {
+    const updatedTags = tags.map(tag => 
+      tag.id === tagId ? { ...tag, selected: isSelected } : tag
     );
-    setSelectedTags(updatedTags);
     
-    const activeTags = updatedTags
+    setTags(updatedTags);
+    
+    // Pass only selected tags to parent
+    const selectedTags = updatedTags
       .filter(tag => tag.selected)
       .map(tag => tag.value);
     
-    onTagChange(activeTags.length > 0 ? activeTags : null);
+    onTagChange(selectedTags.length > 0 ? selectedTags : null);
   };
   
-  // Toggle favorites only filter
-  const toggleFavoritesOnly = (value: boolean) => {
-    setFavoritesOnly(value);
-    onFavoriteFilter(value);
+  // Handle favorites filter toggle
+  const handleFavoritesToggle = (checked: boolean) => {
+    setFavoritesOnly(checked);
+    onFavoriteFilter(checked);
   };
   
-  // Clear all filters
-  const clearFilters = () => {
-    setSelectedLanguages(selectedLanguages.map(lang => ({ ...lang, selected: false })));
-    setSelectedTags(selectedTags.map(tag => ({ ...tag, selected: false })));
-    setFavoritesOnly(false);
-    onLanguageChange(null);
-    onTagChange(null);
-    onFavoriteFilter(false);
-  };
-  
-  // Count active filters
-  const activeFilterCount = 
-    selectedLanguages.filter(l => l.selected).length + 
-    selectedTags.filter(t => t.selected).length + 
-    (favoritesOnly ? 1 : 0);
-  
+  // Count selected items for badge display
+  const selectedLanguagesCount = languages.filter(l => l.selected).length;
+  const selectedTagsCount = tags.filter(t => t.selected).length;
+
   return (
-    <div className={cn("relative flex", className)}>
-      {/* Search input */}
-      <div className="relative flex-1">
-        <input 
-          type="text" 
-          placeholder="Search snippets..." 
-          defaultValue={inputValue}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-full py-2 pl-10 pr-4 border border-slate-300 dark:border-slate-600 rounded-l-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+    <div className={`flex flex-col md:flex-row gap-2 ${className}`}>
+      <div className="relative flex-grow">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
+        <Input
+          type="search"
+          placeholder="Search snippets..."
+          className="pl-9 bg-white dark:bg-slate-800"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <div className="absolute left-3 top-2.5 text-slate-400">
-          <Search className="h-5 w-5" />
-        </div>
       </div>
       
-      {/* Filter button/popover */}
-      <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-        <PopoverTrigger asChild>
-          <Button 
-            variant="outline" 
-            className="rounded-l-none border-l-0 h-10 relative"
+      <div className="flex flex-wrap gap-2">
+        {/* Language Filter Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-10 bg-white dark:bg-slate-800">
+              Languages
+              {selectedLanguagesCount > 0 && (
+                <Badge variant="secondary" className="ml-2 rounded-full px-1.5 py-0.5">
+                  {selectedLanguagesCount}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 max-h-96 overflow-y-auto">
+            <DropdownMenuLabel>Programming Languages</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {languages.map((lang) => (
+              <DropdownMenuCheckboxItem
+                key={lang.id}
+                checked={lang.selected}
+                onCheckedChange={(checked) => handleLanguageChange(lang.id, !!checked)}
+              >
+                {lang.label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
+        {/* Tags Filter Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-10 bg-white dark:bg-slate-800">
+              Tags
+              {selectedTagsCount > 0 && (
+                <Badge variant="secondary" className="ml-2 rounded-full px-1.5 py-0.5">
+                  {selectedTagsCount}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 max-h-96 overflow-y-auto">
+            <DropdownMenuLabel>Topic Tags</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {tags.map((tag) => (
+              <DropdownMenuCheckboxItem
+                key={tag.id}
+                checked={tag.selected}
+                onCheckedChange={(checked) => handleTagChange(tag.id, !!checked)}
+              >
+                {tag.label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
+        {/* Favorites Toggle */}
+        <div className="flex items-center space-x-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-md border border-input h-10">
+          <Checkbox 
+            id="favorites" 
+            checked={favoritesOnly}
+            onCheckedChange={handleFavoritesToggle}
+          />
+          <label
+            htmlFor="favorites"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
           >
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
-            {activeFilterCount > 0 && (
-              <Badge 
-                variant="secondary" 
-                className="ml-2 bg-primary-500 text-white hover:bg-primary-600"
-              >
-                {activeFilterCount}
-              </Badge>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-80" align="end">
-          <div className="grid gap-4">
-            <div className="space-y-2">
-              <h4 className="font-medium leading-none">Filter Snippets</h4>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Narrow down snippets by language, tags, and more
-              </p>
-            </div>
-            <Separator />
-            
-            {/* Languages filter */}
-            <div className="space-y-2">
-              <h5 className="text-sm font-medium">Languages</h5>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {selectedLanguages.map(lang => (
-                  <div key={lang.id} className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={lang.id} 
-                      checked={lang.selected}
-                      onCheckedChange={() => toggleLanguage(lang.id)}
-                    />
-                    <Label 
-                      htmlFor={lang.id}
-                      className="flex-1 cursor-pointer text-sm"
-                    >
-                      {lang.label}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            {/* Tags filter */}
-            <div className="space-y-2">
-              <h5 className="text-sm font-medium">Tags</h5>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {selectedTags.map(tag => (
-                  <div key={tag.id} className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={tag.id} 
-                      checked={tag.selected}
-                      onCheckedChange={() => toggleTag(tag.id)}
-                    />
-                    <Label 
-                      htmlFor={tag.id}
-                      className="flex-1 cursor-pointer text-sm"
-                    >
-                      {tag.label}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            {/* Favorites filter */}
-            <div className="flex items-center space-x-2">
-              <Switch 
-                id="favorites-only" 
-                checked={favoritesOnly}
-                onCheckedChange={toggleFavoritesOnly}
-              />
-              <Label htmlFor="favorites-only">Favorites only</Label>
-            </div>
-            
-            <Separator />
-            
-            {/* Filter actions */}
-            <div className="flex justify-between">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={clearFilters}
-                disabled={activeFilterCount === 0}
-              >
-                Clear filters
-              </Button>
-              <Button 
-                size="sm"
-                onClick={() => setIsFilterOpen(false)}
-              >
-                Apply filters
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+            Favorites only
+          </label>
+        </div>
+      </div>
     </div>
   );
 }

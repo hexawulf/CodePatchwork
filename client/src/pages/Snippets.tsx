@@ -1,8 +1,10 @@
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
+import AdvancedSearch from "@/components/AdvancedSearch";
+import FilterBadges from "@/components/FilterBadges";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Grid3X3, List } from "lucide-react";
+import { Grid3X3, List, Plus } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSnippets } from "@/hooks/useSnippets";
+import AddSnippetDialog from "@/components/AddSnippetDialog";
 
 export default function Snippets() {
   // Local state for filtering and display
@@ -18,6 +21,7 @@ export default function Snippets() {
   const [activeLanguages, setActiveLanguages] = useState<string[] | null>(null);
   const [activeTags, setActiveTags] = useState<string[] | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [isAddSnippetOpen, setIsAddSnippetOpen] = useState(false);
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOrder, setSortOrder] = useState<string>("recent");
@@ -28,6 +32,49 @@ export default function Snippets() {
     tags: activeTags,
     favoritesOnly
   });
+  
+  // Handle filter changes
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+  };
+  
+  const handleLanguageChange = (languages: string[] | null) => {
+    setActiveLanguages(languages);
+  };
+  
+  const handleTagChange = (tags: string[] | null) => {
+    setActiveTags(tags);
+  };
+  
+  const handleFavoriteToggle = (favoritesOnly: boolean) => {
+    setFavoritesOnly(favoritesOnly);
+  };
+  
+  // Handle filter removal
+  const handleRemoveLanguage = (language: string) => {
+    if (activeLanguages) {
+      const updated = activeLanguages.filter(lang => lang !== language);
+      setActiveLanguages(updated.length > 0 ? updated : null);
+    }
+  };
+  
+  const handleRemoveTag = (tag: string) => {
+    if (activeTags) {
+      const updated = activeTags.filter(t => t !== tag);
+      setActiveTags(updated.length > 0 ? updated : null);
+    }
+  };
+  
+  const handleRemoveFavorites = () => {
+    setFavoritesOnly(false);
+  };
+  
+  const handleClearAllFilters = () => {
+    setSearchTerm("");
+    setActiveLanguages(null);
+    setActiveTags(null);
+    setFavoritesOnly(false);
+  };
   
   // Sort snippets based on selected order
   const sortedSnippets = [...(snippets || [])].sort((a, b) => {
