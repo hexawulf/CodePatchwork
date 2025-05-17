@@ -6,6 +6,7 @@ import { queryClient } from "@/lib/queryClient";
 import { SnippetProvider } from "@/contexts/SnippetContext";
 import { CollectionProvider } from "@/contexts/CollectionContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { CodeThemeProvider } from "@/contexts/CodeThemeContext";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Snippets from "@/pages/Snippets";
@@ -47,14 +48,16 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <SnippetProvider>
-          <CollectionProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
-          </CollectionProvider>
-        </SnippetProvider>
+        <CodeThemeProvider>
+          <SnippetProvider>
+            <CollectionProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Router />
+              </TooltipProvider>
+            </CollectionProvider>
+          </SnippetProvider>
+        </CodeThemeProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
