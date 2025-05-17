@@ -10,26 +10,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const search = req.query.search as string | undefined;
       
-      // Handle multiple language parameters
-      let language: string | string[] | undefined;
-      if (Array.isArray(req.query.language)) {
-        language = req.query.language as string[];
-      } else if (req.query.language) {
-        language = req.query.language as string;
+      // Create a filter object for our storage methods
+      const filters: {
+        search?: string;
+        language?: string | string[];
+        tag?: string | string[];
+        favorites?: boolean;
+      } = {};
+      
+      // Add search filter if provided
+      if (search) {
+        filters.search = search;
       }
       
-      // Handle multiple tag parameters
-      let tag: string | string[] | undefined;
-      if (Array.isArray(req.query.tag)) {
-        tag = req.query.tag as string[];
-      } else if (req.query.tag) {
-        tag = req.query.tag as string;
+      // Handle language filter
+      if (req.query.language) {
+        filters.language = Array.isArray(req.query.language) 
+          ? req.query.language as string[] 
+          : req.query.language as string;
+      }
+      
+      // Handle tag filter
+      if (req.query.tag) {
+        filters.tag = Array.isArray(req.query.tag)
+          ? req.query.tag as string[]
+          : req.query.tag as string;
       }
       
       // Handle favorites filter
-      const favorites = req.query.favorites === 'true';
+      if (req.query.favorites === 'true') {
+        filters.favorites = true;
+      }
       
-      const snippets = await storage.getSnippets({ search, language, tag, favorites });
+      const snippets = await storage.getSnippets(filters);
       res.json(snippets);
     } catch (error) {
       console.error("Error fetching snippets:", error);

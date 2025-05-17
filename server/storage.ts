@@ -4,7 +4,7 @@ import {
   collections, type Collection, type InsertCollection,
   collectionItems, type CollectionItem, type InsertCollectionItem
 } from "@shared/schema";
-import { eq, and, or, isNotNull, ilike, sql } from "drizzle-orm";
+import { eq, and, or, isNotNull, ilike, like, sql, desc, asc } from "drizzle-orm";
 
 // Modify the interface with any CRUD methods needed
 export interface IStorage {
@@ -16,8 +16,9 @@ export interface IStorage {
   // Snippet operations
   getSnippets(filters?: {
     search?: string;
-    language?: string;
-    tag?: string;
+    language?: string | string[];
+    tag?: string | string[];
+    favorites?: boolean;
   }): Promise<Snippet[]>;
   getSnippet(id: number): Promise<Snippet | undefined>;
   createSnippet(snippet: InsertSnippet): Promise<Snippet>;
@@ -732,17 +733,31 @@ export class DatabaseStorage implements IStorage {
 
   async getSnippets(filters?: {
     search?: string;
-    language?: string;
-    tag?: string;
+    language?: string | string[];
+    tag?: string | string[];
+    favorites?: boolean;
   }): Promise<Snippet[]> {
     const { db } = await import('./db');
     let query = db.select().from(snippets);
     
     if (filters) {
+      // Handle language filter (single string or array)
       if (filters.language) {
-        query = query.where(eq(snippets.language, filters.language));
+        if (Array.isArray(filters.language)) {
+          // Multiple languages OR condition
+          const languageConditions = filters.language.map(lang => 
+            eq(snippets.language, lang)
+          );
+          if (languageConditions.length > 0) {
+            query = query.where(or(...languageConditions));
+          }
+        } else {
+          // Single language
+          query = query.where(eq(snippets.language, filters.language));
+        }
       }
       
+      // Handle search filter
       if (filters.search) {
         query = query.where(
           or(
@@ -753,13 +768,30 @@ export class DatabaseStorage implements IStorage {
         );
       }
       
+      // Handle tag filter (single string or array)
       if (filters.tag) {
-        // PostgreSQL array contains operator
-        query = query.where(
-          sql`${snippets.tags} @> ARRAY[${filters.tag}]::text[]`
-        );
+        if (Array.isArray(filters.tag)) {
+          // Use ANY operator for array of tags
+          const tagArray = filters.tag.map(t => t.toString());
+          query = query.where(
+            sql`${snippets.tags} && ARRAY[${tagArray}]::text[]`
+          );
+        } else {
+          // Single tag using contains operator
+          query = query.where(
+            sql`${snippets.tags} @> ARRAY[${filters.tag}]::text[]`
+          );
+        }
+      }
+      
+      // Handle favorites filter
+      if (filters.favorites) {
+        query = query.where(eq(snippets.isFavorite, true));
       }
     }
+    
+    // Order by most recently updated
+    query = query.orderBy(desc(snippets.updatedAt));
     
     return await query;
   }
@@ -800,12 +832,21 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`Snippet with id ${id} not found`);
     }
     
+    // Only include fields that can be updated based on our schema
+    const updateData = {
+      title: snippet.title,
+      code: snippet.code,
+      language: snippet.language,
+      description: snippet.description || null,
+      tags: snippet.tags || null,
+      userId: snippet.userId || null,
+      isFavorite: snippet.isFavorite !== undefined ? snippet.isFavorite : existingSnippet.isFavorite,
+      updatedAt: new Date()
+    };
+    
     const result = await db
       .update(snippets)
-      .set({
-        ...snippet,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(snippets.id, id))
       .returning();
     
