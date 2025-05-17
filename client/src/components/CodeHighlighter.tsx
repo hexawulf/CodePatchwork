@@ -20,7 +20,12 @@ interface CodeHighlighterProps {
   theme?: CodeTheme;
 }
 
-export default function CodeHighlighter({ code, language, showLineNumbers = false }: CodeHighlighterProps) {
+export default function CodeHighlighter({ 
+  code, 
+  language, 
+  showLineNumbers = false,
+  theme = 'nightOwl' 
+}: CodeHighlighterProps) {
   // Normalize the language input to match what prism-react-renderer expects
   const getNormalizedLanguage = (lang: string): string => {
     const languageMap: Record<string, string> = {
@@ -146,9 +151,27 @@ export default function CodeHighlighter({ code, language, showLineNumbers = fals
   
   const normalizedLanguage = getNormalizedLanguage(language);
   
+  // Get the appropriate theme from themes object
+  const getTheme = (themeName: CodeTheme) => {
+    const themeMap: Record<CodeTheme, any> = {
+      'nightOwl': themes.nightOwl,
+      'dracula': themes.dracula,
+      'github': themes.github,
+      'vsDark': themes.vsDark,
+      'vsLight': themes.vsLight,
+      'palenight': themes.palenight,
+      'duotoneDark': themes.duotoneDark,
+      'duotoneLight': themes.duotoneLight,
+      'oceanicNext': themes.oceanicNext,
+      'okaidia': themes.okaidia
+    };
+    
+    return themeMap[themeName] || themes.nightOwl;
+  };
+  
   return (
     <Highlight
-      theme={themes.nightOwl}
+      theme={getTheme(theme)}
       code={code}
       language={normalizedLanguage}
     >

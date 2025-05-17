@@ -1,9 +1,13 @@
 import { Highlight, themes } from "prism-react-renderer";
 
+// Define supported themes
+export type CodeTheme = "nightOwl" | "dracula" | "github" | "vsDark" | "vsLight";
+
 interface CodeBlockProps {
   code?: string;
   language?: string;
   showLineNumbers?: boolean;
+  theme?: CodeTheme;
 }
 
 // List of supported languages in prism-react-renderer
@@ -14,7 +18,12 @@ const supportedLanguages = [
   "markdown", "md", "python", "py", "sql", "yaml", "yml"
 ];
 
-export default function CodeBlock({ code = "", language = "text", showLineNumbers = false }: CodeBlockProps) {
+export default function CodeBlock({ 
+  code = "", 
+  language = "text", 
+  showLineNumbers = false,
+  theme = "nightOwl"
+}: CodeBlockProps) {
   // Normalize language and ensure it's supported
   let normalizedLanguage = "text";
   
@@ -29,10 +38,27 @@ export default function CodeBlock({ code = "", language = "text", showLineNumber
   // If code is undefined or null, provide a fallback
   const safeCode = code || "";
   
+  // Get the theme object based on the theme name
+  const getThemeObject = (themeName: CodeTheme) => {
+    switch (themeName) {
+      case "dracula":
+        return themes.dracula;
+      case "github":
+        return themes.github;
+      case "vsDark":
+        return themes.vsDark;
+      case "vsLight":
+        return themes.vsLight;
+      case "nightOwl":
+      default:
+        return themes.nightOwl;
+    }
+  };
+  
   try {
     return (
       <Highlight 
-        theme={themes.nightOwl}
+        theme={getThemeObject(theme)}
         code={safeCode} 
         language={normalizedLanguage}
       >
