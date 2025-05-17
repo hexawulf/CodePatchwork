@@ -47,11 +47,9 @@ export default function SimpleAdvancedSearch({
     setSearchTerm(value);
     
     // Simple debounce using setTimeout
-    const timeoutId = setTimeout(() => {
+    setTimeout(() => {
       onSearchChange(value);
     }, 300);
-    
-    return () => clearTimeout(timeoutId);
   };
   
   // Effect to fetch available languages
@@ -156,6 +154,13 @@ export default function SimpleAdvancedSearch({
           className="pl-9 bg-white dark:bg-slate-800"
           value={searchTerm}
           onChange={handleSearchChange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              // Trigger immediate search on Enter
+              onSearchChange(searchTerm);
+            }
+          }}
         />
       </div>
       
