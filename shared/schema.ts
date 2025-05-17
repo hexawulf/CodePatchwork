@@ -29,6 +29,8 @@ export const snippets = pgTable("snippets", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   viewCount: integer("view_count").default(0),
   isFavorite: boolean("is_favorite").default(false),
+  shareId: text("share_id").unique(), // Unique identifier for sharing
+  isPublic: boolean("is_public").default(false), // Controls if the snippet is publicly accessible
 });
 
 export const insertSnippetSchema = createInsertSchema(snippets).omit({
@@ -75,3 +77,24 @@ export const insertCollectionItemSchema = createInsertSchema(collectionItems).om
 
 export type InsertCollectionItem = z.infer<typeof insertCollectionItemSchema>;
 export type CollectionItem = typeof collectionItems.$inferSelect;
+
+// Comments schema
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  snippetId: integer("snippet_id").notNull(),
+  content: text("content").notNull(),
+  authorName: text("author_name").notNull(), // For guest comments without authentication
+  authorEmail: text("author_email"), // Optional email for notifications
+  userId: integer("user_id"), // For authenticated users (will be used later)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCommentSchema = createInsertSchema(comments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type Comment = typeof comments.$inferSelect;
