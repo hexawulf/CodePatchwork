@@ -40,7 +40,7 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
           >
             <Menu className="h-6 w-6" />
           </button>
-          <span className="ml-2 font-semibold text-slate-800 dark:text-white">CodeCanvas</span>
+          <span className="ml-2 font-semibold text-slate-800 dark:text-white">CodePatchwork</span>
         </div>
         
         <div className="max-w-lg w-full hidden md:block">
