@@ -14,6 +14,7 @@ import Collections from "@/pages/Collections";
 import CollectionDetail from "@/pages/CollectionDetail";
 import Tags from "@/pages/Tags";
 import Settings from "@/pages/Settings";
+import SharedSnippet from "@/pages/SharedSnippet";
 import { useEffect } from "react";
 
 function Router() {
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/collections/:id" component={CollectionDetail} />
       <Route path="/tags" component={Tags} />
       <Route path="/settings" component={Settings} />
+      <Route path="/shared/:shareId" component={SharedSnippet} />
       <Route component={NotFound} />
     </Switch>
   );
