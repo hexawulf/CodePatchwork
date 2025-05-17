@@ -123,13 +123,27 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   const handleShare = async () => {
     try {
       setIsSharing(true);
-      const response = await apiRequest<{shareId: string}>(`/api/snippets/${snippet.id}/share`, {
-        method: 'POST'
+      
+      // Direct fetch call with proper error handling
+      const response = await fetch(`/api/snippets/${snippet.id}/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
-      if (response.shareId) {
-        const shareUrl = `${window.location.origin}/shared/${response.shareId}`;
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.shareId) {
+        const shareUrl = `${window.location.origin}/shared/${data.shareId}`;
+        
+        // Copy to clipboard
         await navigator.clipboard.writeText(shareUrl);
+        
         toast({
           title: "Share link created!",
           description: "The share link has been copied to your clipboard.",
@@ -137,8 +151,11 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
         
         // Invalidate cache to refresh snippet with new shareId
         queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
+      } else {
+        throw new Error("No share ID returned from server");
       }
     } catch (error) {
+      console.error("Share error:", error);
       toast({
         title: "Sharing failed",
         description: "Could not create a share link. Please try again.",
@@ -153,9 +170,20 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   const handleTogglePublic = async () => {
     try {
       setIsTogglePublic(true);
-      const updatedSnippet = await apiRequest<Snippet>(`/api/snippets/${snippet.id}/publish`, {
-        method: 'POST'
+      
+      // Direct fetch call with proper error handling
+      const response = await fetch(`/api/snippets/${snippet.id}/publish`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const updatedSnippet = await response.json();
       
       toast({
         title: updatedSnippet.isPublic ? "Snippet published" : "Snippet unpublished",
@@ -167,6 +195,7 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
       // Invalidate cache to refresh snippet with updated isPublic status
       queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
     } catch (error) {
+      console.error("Toggle public error:", error);
       toast({
         title: "Error",
         description: "Failed to update visibility. Please try again.",
