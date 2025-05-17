@@ -151,6 +151,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function signInWithGoogle(): Promise<User> {
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      // Register with our backend
+      await registerUserWithBackend(result.user);
       return result.user;
     } catch (error: any) {
       const errorMessage = error.message || 'An error occurred during Google sign in';
@@ -169,6 +171,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await updateProfile(currentUser, { displayName });
         // Force refresh the user object
         setCurrentUser({ ...currentUser });
+        
+        // Update user profile in our backend
+        await registerUserWithBackend(currentUser);
       }
     } catch (error: any) {
       const errorMessage = error.message || 'An error occurred while updating profile';
