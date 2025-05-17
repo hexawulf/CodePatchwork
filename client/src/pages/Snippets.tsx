@@ -24,6 +24,11 @@ export default function Snippets() {
   const [isAddSnippetOpen, setIsAddSnippetOpen] = useState(false);
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  
+  // Add a "New Snippet" button
+  const handleAddSnippet = () => {
+    setIsAddSnippetOpen(true);
+  };
   const [sortOrder, setSortOrder] = useState<string>("recent");
   
   const { snippets, isLoading, error } = useSnippets({
@@ -138,8 +143,34 @@ export default function Snippets() {
             >
               <List className="h-5 w-5" />
             </Button>
+            
+            <Button className="h-9 ml-2" onClick={handleAddSnippet}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Snippet
+            </Button>
           </div>
         </div>
+      </div>
+      
+      {/* Advanced Search and filter */}
+      <div className="space-y-4 mb-6">
+        <AdvancedSearch
+          onSearchChange={handleSearchChange}
+          onLanguageChange={handleLanguageChange}
+          onTagChange={handleTagChange}
+          onFavoriteFilter={handleFavoriteToggle}
+          className="mb-2"
+        />
+        
+        <FilterBadges
+          languages={activeLanguages}
+          tags={activeTags}
+          favoritesOnly={favoritesOnly}
+          onRemoveLanguage={handleRemoveLanguage}
+          onRemoveTag={handleRemoveTag}
+          onRemoveFavorites={handleRemoveFavorites}
+          onClearAll={handleClearAllFilters}
+        />
       </div>
       
       {/* Main content */}
@@ -150,7 +181,11 @@ export default function Snippets() {
         viewMode={viewMode}
       />
       
-
+      {/* Add Snippet Dialog */}
+      <AddSnippetDialog
+        open={isAddSnippetOpen}
+        onOpenChange={setIsAddSnippetOpen}
+      />
     </Layout>
   );
 }

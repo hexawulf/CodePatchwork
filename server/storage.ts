@@ -436,8 +436,9 @@ func main() {
           );
         } else {
           // Single language
+          const langLower = filters.language.toLowerCase();
           snippets = snippets.filter(s => 
-            s.language && s.language.toLowerCase() === filters.language?.toLowerCase()
+            s.language && s.language.toLowerCase() === langLower
           );
         }
       }
@@ -452,8 +453,9 @@ func main() {
           );
         } else {
           // Single tag
+          const tagLower = filters.tag.toLowerCase();
           snippets = snippets.filter(s => 
-            s.tags?.some(tag => tag.toLowerCase() === filters.tag?.toLowerCase())
+            s.tags?.some(tag => tag.toLowerCase() === tagLower)
           );
         }
       }
