@@ -39,10 +39,14 @@ export function useSnippets({ search, languages, tags, favoritesOnly }: UseSnipp
   const queryString = queryParams.toString();
   const queryUrl = queryString ? `/api/snippets?${queryString}` : "/api/snippets";
   
+  console.log("Fetching snippets with URL:", queryUrl);
+  
   // Fetch snippets with filters
   const { data, isLoading, error, refetch } = useQuery<Snippet[]>({
     queryKey: [queryUrl],
-    retry: 1
+    retry: 1,
+    refetchOnWindowFocus: false,
+    staleTime: 0 // Always consider data stale to make refetches happen immediately
   });
   
   return {

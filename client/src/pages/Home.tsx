@@ -1,7 +1,8 @@
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
+import SimpleAdvancedSearch from "@/components/SimpleAdvancedSearch";
 import { useSnippets } from "@/hooks/useSnippets";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Settings, Grid3X3, List } from "lucide-react";
 import {
@@ -11,10 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useSnippetContext } from "@/contexts/SnippetContext";
 
 export default function Home() {
+  // Use global context for search term
+  const { searchTerm } = useSnippetContext();
+  
   // Local state for filtering and display
-  const [searchTerm, setSearchTerm] = useState("");
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm || "");
   const [activeLanguages, setActiveLanguages] = useState<string[] | null>(null);
   const [activeTags, setActiveTags] = useState<string[] | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -22,8 +27,13 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOrder, setSortOrder] = useState<string>("recent");
   
+  // Update local search term when global context changes
+  useEffect(() => {
+    setLocalSearchTerm(searchTerm || "");
+  }, [searchTerm]);
+  
   const { snippets, isLoading, error, refetch } = useSnippets({
-    search: searchTerm,
+    search: localSearchTerm,
     languages: activeLanguages,
     tags: activeTags,
     favoritesOnly
