@@ -223,7 +223,12 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
           </div>
           
           <div className="mt-6 max-h-48 overflow-y-auto">
-            <CodeBlock code={snippet.code || ""} language={snippet.language || "text"} />
+            <CodeBlock 
+              code={snippet.code || ""} 
+              language={snippet.language || "text"} 
+              showThemeSelector={true}
+              initialTheme="nightOwl"
+            />
           </div>
         </div>
       </div>
@@ -242,7 +247,12 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
           </div>
           
           <div className="mt-6 max-h-48 overflow-y-auto">
-            <CodeBlock code={snippet.code || ""} language={snippet.language || "text"} />
+            <CodeBlock 
+              code={snippet.code || ""} 
+              language={snippet.language || "text"} 
+              showThemeSelector={true}
+              initialTheme="nightOwl"
+            />
           </div>
         </div>
       )}
