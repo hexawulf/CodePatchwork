@@ -621,6 +621,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/comments/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
+      
+      // Get the comment to verify ownership
+      const comment = await storage.getCommentsBySnippetId(id);
+      const commentToUpdate = comment?.find(c => c.id === id);
+      
+      if (!commentToUpdate) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
+      
+      // Verify comment ownership - users can only update their own comments
+      if (commentToUpdate.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to update this comment" });
+      }
       
       // For simplicity, we'll allow partial updates to comments
       const updatedComment = await storage.updateComment(id, req.body);
