@@ -41,7 +41,9 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   const [isCollectionDialogOpen, setIsCollectionDialogOpen] = useState(false);
   
   // Function to get language color
-  const getLanguageColor = (language: string) => {
+  const getLanguageColor = (language?: string) => {
+    if (!language) return "#718096"; // Default color if language is undefined or null
+    
     const colors: Record<string, string> = {
       javascript: "#F7DF1E",
       typescript: "#3178C6",
@@ -66,7 +68,8 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   const copyToClipboard = async () => {
     try {
       setIsCopying(true);
-      await navigator.clipboard.writeText(snippet.code);
+      const codeToCopy = snippet.code || "";
+      await navigator.clipboard.writeText(codeToCopy);
       toast({
         title: "Code copied!",
         description: "The code snippet has been copied to your clipboard.",
