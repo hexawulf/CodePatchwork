@@ -11,6 +11,7 @@ import SearchBar from "./SearchBar";
 import AddSnippetDialog from "./AddSnippetDialog";
 import ImportExportDialog from "./ImportExportDialog";
 import GlobalCodeThemeSelector from "./GlobalCodeThemeSelector";
+import UserProfileButton from "./UserProfileButton";
 
 interface HeaderProps {
   toggleMobileMenu: () => void;
@@ -126,16 +127,7 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
             </Button>
           </div>
           
-          <div className="relative">
-            <button 
-              className="flex items-center text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-              aria-label="User menu"
-            >
-              <span className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-sm font-medium text-white">
-                JS
-              </span>
-            </button>
-          </div>
+          <UserProfileButton />
         </div>
       </header>
       

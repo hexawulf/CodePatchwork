@@ -7,6 +7,7 @@ import { SnippetProvider } from "@/contexts/SnippetContext";
 import { CollectionProvider } from "@/contexts/CollectionContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { CodeThemeProvider } from "@/contexts/CodeThemeContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Snippets from "@/pages/Snippets";
@@ -49,18 +50,20 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <CodeThemeProvider>
-          <SnippetProvider>
-            <CollectionProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Router />
-              </TooltipProvider>
-            </CollectionProvider>
-          </SnippetProvider>
-        </CodeThemeProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <CodeThemeProvider>
+            <SnippetProvider>
+              <CollectionProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Router />
+                </TooltipProvider>
+              </CollectionProvider>
+            </SnippetProvider>
+          </CodeThemeProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
