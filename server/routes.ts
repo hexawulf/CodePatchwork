@@ -9,10 +9,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/snippets", async (req, res) => {
     try {
       const search = req.query.search as string | undefined;
-      const language = req.query.language as string | undefined;
-      const tag = req.query.tag as string | undefined;
       
-      const snippets = await storage.getSnippets({ search, language, tag });
+      // Handle multiple language parameters
+      let language: string | string[] | undefined;
+      if (Array.isArray(req.query.language)) {
+        language = req.query.language as string[];
+      } else if (req.query.language) {
+        language = req.query.language as string;
+      }
+      
+      // Handle multiple tag parameters
+      let tag: string | string[] | undefined;
+      if (Array.isArray(req.query.tag)) {
+        tag = req.query.tag as string[];
+      } else if (req.query.tag) {
+        tag = req.query.tag as string;
+      }
+      
+      // Handle favorites filter
+      const favorites = req.query.favorites === 'true';
+      
+      const snippets = await storage.getSnippets({ search, language, tag, favorites });
       res.json(snippets);
     } catch (error) {
       console.error("Error fetching snippets:", error);
