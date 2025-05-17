@@ -50,6 +50,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export endpoint MUST be defined BEFORE the :id route to avoid conflict
+  app.get("/api/snippets/export", async (req, res) => {
+    try {
+      // For export, we'll get all snippets without filters for simplicity
+      const snippets = await storage.getSnippets();
+      
+      // Format for download
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
+      
+      res.json(snippets);
+    } catch (error) {
+      console.error("Error exporting snippets:", error);
+      res.status(500).json({ message: "Failed to export snippets" });
+    }
+  });
+
+  // Individual snippet route
   app.get("/api/snippets/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -206,10 +224,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Move export endpoint BEFORE the /:id parameter route to avoid route conflicts
   app.get("/api/snippets/export", async (req, res) => {
     try {
       // For export, we'll get all snippets without filters for simplicity
-      // This avoids potential issues with query parameter parsing
       const snippets = await storage.getSnippets();
       
       // Format for download
