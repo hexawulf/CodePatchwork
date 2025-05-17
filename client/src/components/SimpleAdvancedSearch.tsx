@@ -27,6 +27,7 @@ interface AdvancedSearchProps {
   onTagChange: (tags: string[] | null) => void;
   onFavoriteFilter: (favoritesOnly: boolean) => void;
   className?: string;
+  refetch?: () => void;
 }
 
 export default function SimpleAdvancedSearch({ 
@@ -34,7 +35,8 @@ export default function SimpleAdvancedSearch({
   onLanguageChange, 
   onTagChange, 
   onFavoriteFilter,
-  className = "" 
+  className = "",
+  refetch 
 }: AdvancedSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [languages, setLanguages] = useState<FilterOption[]>([]);
@@ -159,6 +161,8 @@ export default function SimpleAdvancedSearch({
               e.preventDefault();
               // Trigger immediate search on Enter
               onSearchChange(searchTerm);
+              // Execute immediate refetch if available
+              if (refetch) refetch();
             }
           }}
         />
