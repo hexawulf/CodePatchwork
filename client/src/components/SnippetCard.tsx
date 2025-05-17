@@ -11,6 +11,7 @@ import CodeBlock from "./CodeBlock";
 import { useSnippetContext } from "@/contexts/SnippetContext";
 import AddSnippetDialog from "./AddSnippetDialog";
 import AddToCollectionDialog from "./AddToCollectionDialog";
+import ShareLinkDialog from "./ShareLinkDialog";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +44,8 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCollectionDialogOpen, setIsCollectionDialogOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
   const [isTogglePublic, setIsTogglePublic] = useState(false);
   
   // Function to get language color
@@ -139,15 +142,10 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
       const data = await response.json();
       
       if (data && data.shareId) {
-        const shareUrl = `${window.location.origin}/shared/${data.shareId}`;
-        
-        // Copy to clipboard
-        await navigator.clipboard.writeText(shareUrl);
-        
-        toast({
-          title: "Share link created!",
-          description: "The share link has been copied to your clipboard.",
-        });
+        // Create the share URL and open the dialog
+        const url = `${window.location.origin}/shared/${data.shareId}`;
+        setShareUrl(url);
+        setIsShareDialogOpen(true);
         
         // Invalidate cache to refresh snippet with new shareId
         queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
@@ -396,6 +394,13 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
         open={isCollectionDialogOpen}
         onOpenChange={setIsCollectionDialogOpen}
         snippet={snippet}
+      />
+      
+      {/* Share Link Dialog */}
+      <ShareLinkDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        shareUrl={shareUrl}
       />
     </div>
   );
