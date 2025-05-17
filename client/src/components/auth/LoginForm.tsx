@@ -66,14 +66,30 @@ export default function LoginForm({
   const handleGoogleSignIn = async () => {
     try {
       setIsGoogleLoading(true);
+      console.log("Starting Google sign-in process...");
       await signInWithGoogle();
+      console.log("Google sign-in completed successfully");
       toast({
         title: 'Login successful',
         description: 'Welcome to CodeCanvas!',
       });
       if (onSuccess) onSuccess();
     } catch (error) {
-      // Error is already handled in the auth context
+      console.log("Google sign-in error in component:", error);
+      // Handle specific errors here with user-friendly messages
+      if ((error as any)?.code === 'auth/unauthorized-domain') {
+        toast({
+          title: 'Domain Not Authorized',
+          description: 'This domain is not authorized for Firebase authentication. Please use email/password login or contact the administrator.',
+          variant: 'destructive'
+        });
+      } else if ((error as any)?.code === 'auth/operation-not-allowed') {
+        toast({
+          title: 'Login failed',
+          description: 'Google sign-in is not enabled for this application. Please try another method.',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setIsGoogleLoading(false);
     }

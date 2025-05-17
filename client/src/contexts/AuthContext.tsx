@@ -150,20 +150,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function signInWithGoogle(): Promise<User> {
     try {
-      // Reset the provider to avoid duplicate scopes
-      const provider = new GoogleAuthProvider();
-      
-      // Add custom OAuth scopes
-      provider.addScope('profile');
-      provider.addScope('email');
-      
-      // Force account selection even if user is already signed in
-      provider.setCustomParameters({
+      // Use the already created and exported googleProvider from firebase.ts
+      // Configure it for this specific sign-in attempt
+      googleProvider.setCustomParameters({
         prompt: 'select_account'
       });
       
       // Use popup for mobile compatibility
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, googleProvider);
       
       // Log success info (for debugging)
       console.log("Google sign in successful");
