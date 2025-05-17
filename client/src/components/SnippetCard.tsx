@@ -125,7 +125,7 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
       setIsSharing(true);
       const response = await apiRequest<{shareId: string}>(`/api/snippets/${snippet.id}/share`, {
         method: 'POST'
-      }) as {shareId: string};
+      });
       
       if (response.shareId) {
         const shareUrl = `${window.location.origin}/shared/${response.shareId}`;
@@ -155,7 +155,7 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
       setIsTogglePublic(true);
       const updatedSnippet = await apiRequest<Snippet>(`/api/snippets/${snippet.id}/publish`, {
         method: 'POST'
-      }) as Snippet;
+      });
       
       toast({
         title: updatedSnippet.isPublic ? "Snippet published" : "Snippet unpublished",
