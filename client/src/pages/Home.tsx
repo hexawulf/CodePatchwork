@@ -22,7 +22,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOrder, setSortOrder] = useState<string>("recent");
   
-  const { snippets, isLoading, error } = useSnippets({
+  const { snippets, isLoading, error, refetch } = useSnippets({
     search: searchTerm,
     languages: activeLanguages,
     tags: activeTags,
