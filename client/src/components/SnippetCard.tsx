@@ -223,7 +223,7 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
           </div>
           
           <div className="mt-6 max-h-48 overflow-y-auto">
-            <CodeBlock code={snippet.code} language={snippet.language} />
+            <CodeBlock code={snippet.code || ""} language={snippet.language || "text"} />
           </div>
         </div>
       </div>
@@ -242,7 +242,7 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
           </div>
           
           <div className="mt-6 max-h-48 overflow-y-auto">
-            <CodeBlock code={snippet.code} language={snippet.language} />
+            <CodeBlock code={snippet.code || ""} language={snippet.language || "text"} />
           </div>
         </div>
       )}
