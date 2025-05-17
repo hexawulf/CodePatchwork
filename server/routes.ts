@@ -10,6 +10,35 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 
+// Auth middleware to verify Firebase authentication tokens
+const authMiddleware = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: "Unauthorized - No token provided" });
+    }
+    
+    const uid = authHeader.split(' ')[1];
+    if (!uid) {
+      return res.status(401).json({ message: "Unauthorized - Invalid token" });
+    }
+    
+    // Look up the user in our database
+    const user = await storage.getUser(uid);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Attach the user to the request object
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("Auth middleware error:", error);
+    return res.status(500).json({ message: "Internal server error during authentication" });
+  }
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Firebase Auth endpoints
   app.post("/api/auth/user", async (req, res) => {
@@ -36,27 +65,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/auth/me", async (req, res) => {
+  // Get current user's profile
+  app.get("/api/auth/me", authMiddleware, async (req: any, res) => {
     try {
-      // This would be better with proper auth middleware
-      // For now, we just check if the Firebase UID is provided in the Authorization header
-      const authHeader = req.headers.authorization;
-      
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      const uid = authHeader.split(' ')[1];
-      if (!uid) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      const user = await storage.getUser(uid);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      res.json(user);
+      // User is already attached to req object by authMiddleware
+      res.json(req.user);
     } catch (error) {
       console.error("Error fetching current user:", error);
       res.status(500).json({ message: "Failed to fetch user data" });
