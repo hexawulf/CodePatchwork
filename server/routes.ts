@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
@@ -11,7 +11,7 @@ import {
 import { z } from "zod";
 
 // Auth middleware to verify Firebase authentication tokens
-const authMiddleware = async (req: any, res: Response, next: NextFunction) => {
+const authMiddleware: RequestHandler = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -31,7 +31,7 @@ const authMiddleware = async (req: any, res: Response, next: NextFunction) => {
     }
     
     // Attach the user to the request object
-    req.user = user;
+    (req as any).user = user;
     next();
   } catch (error) {
     console.error("Auth middleware error:", error);
@@ -66,10 +66,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get current user's profile
-  app.get("/api/auth/me", authMiddleware, async (req: any, res) => {
+  app.get("/api/auth/me", authMiddleware, (req, res) => {
     try {
       // User is already attached to req object by authMiddleware
-      res.json(req.user);
+      res.json((req as any).user);
     } catch (error) {
       console.error("Error fetching current user:", error);
       res.status(500).json({ message: "Failed to fetch user data" });
@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/snippets", async (req, res) => {
+  app.post("/api/snippets", authMiddleware, async (req, res) => {
     try {
       const parsedBody = insertSnippetSchema.parse(req.body);
       const snippet = await storage.createSnippet(parsedBody);
@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/snippets/:id", async (req, res) => {
+  app.put("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const parsedBody = insertSnippetSchema.parse(req.body);
