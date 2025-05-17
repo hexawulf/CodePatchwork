@@ -226,8 +226,6 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
             <CodeBlock 
               code={snippet.code || ""} 
               language={snippet.language || "text"} 
-              showThemeSelector={true}
-              initialTheme="nightOwl"
             />
           </div>
         </div>
@@ -250,8 +248,6 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
             <CodeBlock 
               code={snippet.code || ""} 
               language={snippet.language || "text"} 
-              showThemeSelector={true}
-              initialTheme="nightOwl"
             />
           </div>
         </div>
