@@ -1,8 +1,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, Plus, User, Sun, Moon } from "lucide-react";
+import { Menu, Plus, Sun, Moon, Upload, Download } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import SearchBar from "./SearchBar";
 import AddSnippetDialog from "./AddSnippetDialog";
+import ImportExportDialog from "./ImportExportDialog";
 
 interface HeaderProps {
   toggleMobileMenu: () => void;
@@ -21,12 +28,16 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
     }
   };
   
-  // Managing dialog state directly in header instead of separate button
+  // Managing dialog states
   const [snippetDialogOpen, setSnippetDialogOpen] = useState(false);
+  const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
   
   const openCreateModal = () => {
     setSnippetDialogOpen(true);
-    console.log("Open create modal clicked");
+  };
+  
+  const openImportModal = () => {
+    setImportExportDialogOpen(true);
   };
   
   return (
@@ -62,19 +73,54 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
           </button>
           
           {/* Add Snippet Dialog - This is the single place to add new snippets */}
-          <div className="hidden md:block">
+          {/* Desktop actions */}
+          <div className="hidden md:flex items-center space-x-2">
             <AddSnippetDialog />
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Import/Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={openImportModal}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import Snippets
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.location.href = "/api/snippets/export"}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Snippets
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
-          {/* Mobile version of Add Snippet button */}
-          <Button 
-            onClick={openCreateModal}
-            className="md:hidden flex items-center"
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add
-          </Button>
+          {/* Mobile actions */}
+          <div className="md:hidden flex items-center space-x-2">
+            <Button 
+              onClick={openCreateModal}
+              className="flex items-center"
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add
+            </Button>
+            
+            <Button 
+              onClick={openImportModal}
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
           
           <div className="relative">
             <button 
@@ -96,6 +142,9 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
       
       {/* Mobile AddSnippetDialog - controlled by mobile button */}
       <AddSnippetDialog open={snippetDialogOpen} onOpenChange={setSnippetDialogOpen} />
+      
+      {/* Import/Export Dialog */}
+      <ImportExportDialog open={importExportDialogOpen} onOpenChange={setImportExportDialogOpen} />
     </>
   );
 }
