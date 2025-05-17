@@ -230,10 +230,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/snippets/:id/favorite", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
       
       const snippet = await storage.getSnippet(id);
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      // Ensure we only let users toggle favorites on their own snippets
+      if (snippet.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to favorite this snippet" });
       }
       
       const updatedSnippet = await storage.toggleSnippetFavorite(id);
@@ -363,7 +369,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/collections", authMiddleware, async (req, res) => {
     try {
-      const parsedBody = insertCollectionSchema.parse(req.body);
+      // Add the current user's ID to the collection data
+      const currentUserId = (req as any).user?.id;
+      const collectionData = {
+        ...req.body,
+        userId: currentUserId
+      };
+      
+      const parsedBody = insertCollectionSchema.parse(collectionData);
       const collection = await storage.createCollection(parsedBody);
       res.status(201).json(collection);
     } catch (error) {
@@ -381,11 +394,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/collections/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
       const parsedBody = insertCollectionSchema.parse(req.body);
       
       const collection = await storage.getCollection(id);
       if (!collection) {
         return res.status(404).json({ message: "Collection not found" });
+      }
+      
+      // Verify ownership - users can only update their own collections
+      if (collection.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to modify this collection" });
       }
       
       const updatedCollection = await storage.updateCollection(id, parsedBody);
@@ -405,10 +424,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/collections/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
       
       const collection = await storage.getCollection(id);
       if (!collection) {
         return res.status(404).json({ message: "Collection not found" });
+      }
+      
+      // Verify ownership - users can only delete their own collections
+      if (collection.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to delete this collection" });
       }
       
       await storage.deleteCollection(id);
@@ -423,6 +448,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const collectionId = parseInt(req.params.collectionId);
       const snippetId = parseInt(req.params.snippetId);
+      const currentUserId = (req as any).user?.id;
+      
+      // Verify collection ownership
+      const collection = await storage.getCollection(collectionId);
+      if (!collection) {
+        return res.status(404).json({ message: "Collection not found" });
+      }
+      
+      // Ensure users can only add snippets to their own collections
+      if (collection.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to modify this collection" });
+      }
       
       const parsedBody = insertCollectionItemSchema.parse({
         collectionId,
@@ -447,6 +484,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const collectionId = parseInt(req.params.collectionId);
       const snippetId = parseInt(req.params.snippetId);
+      const currentUserId = (req as any).user?.id;
+      
+      // Verify collection ownership
+      const collection = await storage.getCollection(collectionId);
+      if (!collection) {
+        return res.status(404).json({ message: "Collection not found" });
+      }
+      
+      // Ensure users can only remove snippets from their own collections
+      if (collection.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to modify this collection" });
+      }
       
       await storage.removeSnippetFromCollection(collectionId, snippetId);
       res.status(204).send();
