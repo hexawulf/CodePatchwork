@@ -71,7 +71,7 @@ export default function LoginForm({
       console.log("Google sign-in completed successfully");
       toast({
         title: 'Login successful',
-        description: 'Welcome to CodeCanvas!',
+        description: 'Welcome to CodePatchwork!',
       });
       if (onSuccess) onSuccess();
     } catch (error) {
@@ -83,10 +83,29 @@ export default function LoginForm({
           description: 'This domain is not authorized for Firebase authentication. Please use email/password login or contact the administrator.',
           variant: 'destructive'
         });
-      } else if ((error as any)?.code === 'auth/operation-not-allowed') {
+      } else if ((error as any)?.code === 'auth/configuration-not-found') {
         toast({
-          title: 'Login failed',
-          description: 'Google sign-in is not enabled for this application. Please try another method.',
+          title: 'Firebase Configuration Error',
+          description: 'There is an issue with the Firebase configuration. Please try email/password login instead.',
+          variant: 'destructive'
+        });
+      } else if ((error as any)?.code === 'auth/popup-blocked') {
+        toast({
+          title: 'Popup Blocked',
+          description: 'The sign-in popup was blocked by your browser. Please allow popups for this site.',
+          variant: 'destructive'
+        });
+      } else if ((error as any)?.code === 'auth/cancelled-popup-request' || (error as any)?.code === 'auth/popup-closed-by-user') {
+        // User canceled, just show a subtle message
+        toast({
+          title: 'Sign-in canceled',
+          description: 'Google sign-in was canceled. You can try again or use email/password.',
+        });
+      } else {
+        // Generic error handling
+        toast({
+          title: 'Google sign-in failed',
+          description: (error as any)?.message || 'An unknown error occurred. Please try another sign-in method.',
           variant: 'destructive'
         });
       }
