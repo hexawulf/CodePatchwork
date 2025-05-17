@@ -197,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/snippets/:id", async (req, res) => {
+  app.delete("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -215,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Toggle favorite status
-  app.post("/api/snippets/:id/favorite", async (req, res) => {
+  app.post("/api/snippets/:id/favorite", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -255,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Import/Export endpoints
-  app.post("/api/snippets/import", async (req, res) => {
+  app.post("/api/snippets/import", authMiddleware, async (req, res) => {
     try {
       const { snippets } = req.body;
       
@@ -277,7 +277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           language: snippet.language,
           description: snippet.description || null,
           tags: snippet.tags || null,
-          userId: null, // Set proper user ID when auth is implemented
+          userId: (req as any).user?.id || null,
           isFavorite: snippet.isFavorite || false
         });
         
@@ -349,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/collections", async (req, res) => {
+  app.post("/api/collections", authMiddleware, async (req, res) => {
     try {
       const parsedBody = insertCollectionSchema.parse(req.body);
       const collection = await storage.createCollection(parsedBody);
@@ -366,7 +366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put("/api/collections/:id", async (req, res) => {
+  app.put("/api/collections/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const parsedBody = insertCollectionSchema.parse(req.body);
@@ -390,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/collections/:id", async (req, res) => {
+  app.delete("/api/collections/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -407,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/collections/:collectionId/snippets/:snippetId", async (req, res) => {
+  app.post("/api/collections/:collectionId/snippets/:snippetId", authMiddleware, async (req, res) => {
     try {
       const collectionId = parseInt(req.params.collectionId);
       const snippetId = parseInt(req.params.snippetId);
