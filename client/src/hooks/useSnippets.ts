@@ -3,11 +3,12 @@ import { Snippet } from "@shared/schema";
 
 interface UseSnippetsOptions {
   search?: string;
-  language?: string | null;
-  tag?: string | null;
+  languages?: string[] | null;
+  tags?: string[] | null;
+  favoritesOnly?: boolean;
 }
 
-export function useSnippets({ search, language, tag }: UseSnippetsOptions = {}) {
+export function useSnippets({ search, languages, tags, favoritesOnly }: UseSnippetsOptions = {}) {
   // Build query key with filters
   const queryKey = ["/api/snippets"];
   const queryParams = new URLSearchParams();
@@ -16,12 +17,23 @@ export function useSnippets({ search, language, tag }: UseSnippetsOptions = {}) 
     queryParams.append("search", search);
   }
   
-  if (language) {
-    queryParams.append("language", language);
+  // Add multiple languages if provided
+  if (languages && languages.length > 0) {
+    languages.forEach(lang => {
+      queryParams.append("language", lang);
+    });
   }
   
-  if (tag) {
-    queryParams.append("tag", tag);
+  // Add multiple tags if provided
+  if (tags && tags.length > 0) {
+    tags.forEach(tag => {
+      queryParams.append("tag", tag);
+    });
+  }
+  
+  // Add favorites filter if enabled
+  if (favoritesOnly) {
+    queryParams.append("favorites", "true");
   }
   
   const queryString = queryParams.toString();

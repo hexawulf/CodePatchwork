@@ -15,16 +15,18 @@ import {
 export default function Home() {
   // Local state for filtering and display
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeLanguage, setActiveLanguage] = useState<string | null>(null);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeLanguages, setActiveLanguages] = useState<string[] | null>(null);
+  const [activeTags, setActiveTags] = useState<string[] | null>(null);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortOrder, setSortOrder] = useState<string>("recent");
   
   const { snippets, isLoading, error } = useSnippets({
     search: searchTerm,
-    language: activeLanguage,
-    tag: activeTag
+    languages: activeLanguages,
+    tags: activeTags,
+    favoritesOnly
   });
   
   // Sort snippets based on selected order

@@ -419,24 +419,48 @@ func main() {
   // Snippet operations
   async getSnippets(filters?: {
     search?: string;
-    language?: string;
-    tag?: string;
+    language?: string | string[];
+    tag?: string | string[];
+    favorites?: boolean;
   }): Promise<Snippet[]> {
     let snippets = Array.from(this.snippets.values());
     
     if (filters) {
-      // Filter by language
+      // Filter by language - support both single language and multiple languages
       if (filters.language) {
-        snippets = snippets.filter(s => 
-          s.language.toLowerCase() === filters.language?.toLowerCase()
-        );
+        if (Array.isArray(filters.language)) {
+          // Multiple languages (logical OR)
+          const languages = filters.language.map(lang => lang.toLowerCase());
+          snippets = snippets.filter(s => 
+            s.language && languages.includes(s.language.toLowerCase())
+          );
+        } else {
+          // Single language
+          snippets = snippets.filter(s => 
+            s.language && s.language.toLowerCase() === filters.language?.toLowerCase()
+          );
+        }
       }
       
-      // Filter by tag
+      // Filter by tag - support both single tag and multiple tags
       if (filters.tag) {
-        snippets = snippets.filter(s => 
-          s.tags?.some(tag => tag.toLowerCase() === filters.tag?.toLowerCase())
-        );
+        if (Array.isArray(filters.tag)) {
+          // Multiple tags (logical OR)
+          const tags = filters.tag.map(tag => tag.toLowerCase());
+          snippets = snippets.filter(s => 
+            s.tags?.some(tag => tags.includes(tag.toLowerCase()))
+          );
+        } else {
+          // Single tag
+          snippets = snippets.filter(s => 
+            s.tags?.some(tag => tag.toLowerCase() === filters.tag?.toLowerCase())
+          );
+        }
+      }
+      
+      // Filter by favorites
+      if (filters.favorites) {
+        snippets = snippets.filter(s => s.isFavorite);
       }
       
       // Filter by search term (title, description, code)
@@ -445,7 +469,7 @@ func main() {
         snippets = snippets.filter(s => 
           s.title.toLowerCase().includes(searchTerm) || 
           (s.description && s.description.toLowerCase().includes(searchTerm)) ||
-          s.code.toLowerCase().includes(searchTerm)
+          (s.code && s.code.toLowerCase().includes(searchTerm))
         );
       }
     }
