@@ -43,16 +43,35 @@ export default function SimpleAdvancedSearch({
   const [tags, setTags] = useState<FilterOption[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   
-  // Handle search with basic timeout
+  // Handle search with proper debounce
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
     
-    // Simple debounce using setTimeout
-    setTimeout(() => {
+    // Clear any existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Set new debounce timeout
+    const newTimeout = setTimeout(() => {
       onSearchChange(value);
     }, 300);
+    
+    setSearchTimeout(newTimeout);
   };
+  
+  // Effect to clean up timeouts when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clean up timeout to prevent memory leaks
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
   
   // Effect to fetch available languages
   useEffect(() => {
