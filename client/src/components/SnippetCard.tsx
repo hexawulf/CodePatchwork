@@ -201,11 +201,17 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
           viewMode === "list" && "md:hidden"
         )}>
           <div className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-700 rounded-bl text-xs px-2 py-0.5 flex items-center">
-            <span 
-              className="w-2 h-2 rounded-full mr-1"
-              style={{ backgroundColor: getLanguageColor(snippet.language) }}
-            ></span>
-            <span className="text-slate-700 dark:text-slate-300">{snippet.language}</span>
+            {snippet.language ? (
+              <>
+                <span 
+                  className="w-2 h-2 rounded-full mr-1"
+                  style={{ backgroundColor: getLanguageColor(snippet.language) }}
+                ></span>
+                <span className="text-slate-700 dark:text-slate-300">{snippet.language}</span>
+              </>
+            ) : (
+              <span className="text-slate-700 dark:text-slate-300">text</span>
+            )}
             <button 
               className={`ml-2 ${isCopying ? 'text-green-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               aria-label="Copy code"
