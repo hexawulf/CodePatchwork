@@ -10,6 +10,7 @@ import {
 import SearchBar from "./SearchBar";
 import AddSnippetDialog from "./AddSnippetDialog";
 import ImportExportDialog from "./ImportExportDialog";
+import GlobalCodeThemeSelector from "./GlobalCodeThemeSelector";
 
 interface HeaderProps {
   toggleMobileMenu: () => void;
@@ -75,6 +76,7 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
           {/* Add Snippet Dialog - This is the single place to add new snippets */}
           {/* Desktop actions */}
           <div className="hidden md:flex items-center space-x-2">
+            <GlobalCodeThemeSelector />
             <AddSnippetDialog />
             
             <DropdownMenu>
@@ -103,6 +105,8 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
           
           {/* Mobile actions */}
           <div className="md:hidden flex items-center space-x-2">
+            <GlobalCodeThemeSelector />
+            
             <Button 
               onClick={openCreateModal}
               className="flex items-center"
