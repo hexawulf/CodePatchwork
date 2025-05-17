@@ -176,11 +176,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
       const parsedBody = insertSnippetSchema.parse(req.body);
       
       const snippet = await storage.getSnippet(id);
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      // Verify ownership - users can only update their own snippets
+      if (snippet.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to modify this snippet" });
       }
       
       const updatedSnippet = await storage.updateSnippet(id, parsedBody);
@@ -200,10 +206,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUserId = (req as any).user?.id;
       
       const snippet = await storage.getSnippet(id);
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      // Verify ownership - users can only delete their own snippets
+      if (snippet.userId !== currentUserId) {
+        return res.status(403).json({ message: "You don't have permission to delete this snippet" });
       }
       
       await storage.deleteSnippet(id);
@@ -534,10 +546,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Snippet not found" });
       }
       
-      // Combine snippet ID with the comment data from the body
+      // Combine snippet ID and user ID with the comment data from the body
       const commentData = {
         ...req.body,
-        snippetId
+        snippetId,
+        userId: (req as any).user?.id || null
       };
       
       const parsedBody = insertCommentSchema.parse(commentData);
