@@ -208,10 +208,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/snippets/export", async (req, res) => {
     try {
-      // Get all snippets or filtered ones
-      const snippets = await storage.getSnippets(req.query);
+      // For export, we'll get all snippets without filters for simplicity
+      // This avoids potential issues with query parameter parsing
+      const snippets = await storage.getSnippets();
       
-      // Format for download (could also add format options like JSON/CSV)
+      // Format for download
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
       
