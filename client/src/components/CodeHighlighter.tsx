@@ -1,17 +1,5 @@
 import { Highlight, themes } from "prism-react-renderer";
-
-// Define available themes type
-export type CodeTheme = 
-  | 'nightOwl' 
-  | 'dracula' 
-  | 'github' 
-  | 'vsDark' 
-  | 'vsLight' 
-  | 'palenight'
-  | 'duotoneDark'
-  | 'duotoneLight'
-  | 'oceanicNext'
-  | 'okaidia';
+import { CodeTheme } from "./CodeBlock";
 
 interface CodeHighlighterProps {
   code: string;
@@ -151,37 +139,38 @@ export default function CodeHighlighter({
   
   const normalizedLanguage = getNormalizedLanguage(language);
   
-  // Get the appropriate theme from themes object
-  const getTheme = (themeName: CodeTheme) => {
-    const themeMap: Record<CodeTheme, any> = {
-      'nightOwl': themes.nightOwl,
-      'dracula': themes.dracula,
-      'github': themes.github,
-      'vsDark': themes.vsDark,
-      'vsLight': themes.vsLight,
-      'palenight': themes.palenight,
-      'duotoneDark': themes.duotoneDark,
-      'duotoneLight': themes.duotoneLight,
-      'oceanicNext': themes.oceanicNext,
-      'okaidia': themes.okaidia
-    };
-    
-    return themeMap[themeName] || themes.nightOwl;
+  // Get the theme object based on the theme name
+  const getThemeObject = (themeName: CodeTheme) => {
+    switch (themeName) {
+      case "dracula":
+        return themes.dracula;
+      case "github":
+        return themes.github;
+      case "vsDark":
+        return themes.vsDark;
+      case "vsLight":
+        return themes.vsLight;
+      case "nightOwl":
+      default:
+        return themes.nightOwl;
+    }
   };
   
   return (
     <Highlight
-      theme={getTheme(theme)}
+      theme={getThemeObject(theme)}
       code={code}
       language={normalizedLanguage}
     >
       {({ className, style, tokens, getLineProps, getTokenProps }) => (
         <pre style={{ ...style, margin: 0, padding: '1rem', overflow: 'auto' }} className={className}>
           {tokens.map((line, i) => (
-            <div key={i} {...getLineProps({ line, key: i })}>
+            <div key={i} className={getLineProps({ line, key: i }).className} style={getLineProps({ line, key: i }).style}>
               {showLineNumbers && <span className="opacity-50 mr-4 inline-block w-5 text-right select-none">{i + 1}</span>}
               {line.map((token, key) => (
-                <span key={key} {...getTokenProps({ token, key })} />
+                <span key={key} className={getTokenProps({ token, key }).className} style={getTokenProps({ token, key }).style}>
+                  {token.content}
+                </span>
               ))}
             </div>
           ))}

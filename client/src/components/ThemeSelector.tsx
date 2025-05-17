@@ -1,70 +1,68 @@
-import { useState } from "react";
-import { CodeTheme } from "./CodeHighlighter";
+import { useEffect, useState } from "react";
+import { CodeTheme } from "./CodeBlock";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 
 interface ThemeSelectorProps {
-  currentTheme: CodeTheme;
-  onThemeChange: (theme: CodeTheme) => void;
-  label?: boolean;
+  value?: CodeTheme;
+  onChange?: (theme: CodeTheme) => void;
+  showLabel?: boolean;
 }
 
 export default function ThemeSelector({
-  currentTheme,
-  onThemeChange,
-  label = false
+  value = "nightOwl",
+  onChange,
+  showLabel = false
 }: ThemeSelectorProps) {
-  const { toast } = useToast();
-  const themes: Array<{ value: CodeTheme; label: string }> = [
+  const [theme, setTheme] = useState<CodeTheme>(value);
+  
+  // Sync with external value
+  useEffect(() => {
+    if (value !== theme) {
+      setTheme(value);
+    }
+  }, [value]);
+
+  const handleChange = (newTheme: string) => {
+    const validTheme = newTheme as CodeTheme;
+    setTheme(validTheme);
+    if (onChange) {
+      onChange(validTheme);
+    }
+  };
+  
+  const themes = [
     { value: "nightOwl", label: "Night Owl" },
     { value: "dracula", label: "Dracula" },
     { value: "github", label: "GitHub" },
     { value: "vsDark", label: "VS Dark" },
-    { value: "vsLight", label: "VS Light" },
-    { value: "palenight", label: "Palenight" },
-    { value: "duotoneDark", label: "Duotone Dark" },
-    { value: "duotoneLight", label: "Duotone Light" },
-    { value: "oceanicNext", label: "Oceanic Next" },
-    { value: "okaidia", label: "Okaidia" },
+    { value: "vsLight", label: "VS Light" }
   ];
-
-  const handleThemeChange = (value: string) => {
-    // Type assertion as we know the value will be one of the CodeTheme values
-    const newTheme = value as CodeTheme;
-    onThemeChange(newTheme);
-    
-    toast({
-      title: "Theme Updated",
-      description: `Theme changed to ${themes.find(t => t.value === newTheme)?.label}`,
-      duration: 2000
-    });
-  };
 
   return (
     <div className="flex items-center gap-2">
-      {label && <Label htmlFor="theme-select" className="text-sm">Theme:</Label>}
-      <Select value={currentTheme} onValueChange={handleThemeChange}>
-        <SelectTrigger id="theme-select" className="w-[180px]">
-          <SelectValue placeholder="Select a theme" />
+      {showLabel && (
+        <Label htmlFor="theme-select">Theme:</Label>
+      )}
+      <Select
+        value={theme}
+        onValueChange={handleChange}
+      >
+        <SelectTrigger id="theme-select" className="w-[140px]">
+          <SelectValue placeholder="Select theme" />
         </SelectTrigger>
         <SelectContent>
-          <SelectGroup>
-            <SelectLabel>Code Themes</SelectLabel>
-            {themes.map((theme) => (
-              <SelectItem key={theme.value} value={theme.value}>
-                {theme.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
+          {themes.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

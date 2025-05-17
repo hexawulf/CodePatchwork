@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Highlight, themes } from "prism-react-renderer";
+import ThemeSelector from "./ThemeSelector";
 
 // Define supported themes
 export type CodeTheme = "nightOwl" | "dracula" | "github" | "vsDark" | "vsLight";
@@ -7,7 +9,8 @@ interface CodeBlockProps {
   code?: string;
   language?: string;
   showLineNumbers?: boolean;
-  theme?: CodeTheme;
+  initialTheme?: CodeTheme;
+  showThemeSelector?: boolean;
 }
 
 // List of supported languages in prism-react-renderer
@@ -65,10 +68,10 @@ export default function CodeBlock({
         {({ className, style, tokens, getLineProps, getTokenProps }) => (
           <pre style={{ ...style, margin: 0, padding: '1rem', textAlign: 'left', overflow: 'auto' }} className={className}>
             {tokens.map((line, i) => (
-              <div key={i} style={getLineProps({ line, key: i }).style} className={getLineProps({ line, key: i }).className}>
+              <div key={i} {...getLineProps({ line, key: i })}>
                 {showLineNumbers && <span className="opacity-50 mr-4 inline-block w-8 text-right">{i + 1}</span>}
                 {line.map((token, key) => (
-                  <span key={key} style={getTokenProps({ token, key }).style} className={getTokenProps({ token, key }).className}>
+                  <span key={key} {...getTokenProps({ token, key })}>
                     {token.content}
                   </span>
                 ))}
