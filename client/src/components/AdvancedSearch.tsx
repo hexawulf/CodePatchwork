@@ -12,7 +12,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useDebouncedCallback } from '@/hooks/use-debounced-callback';
+// Create a simple debounce utility inline instead of importing
+function useDebounce(fn: Function, delay: number) {
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  const debouncedFn = React.useCallback((...args: any[]) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
+      fn(...args);
+    }, delay);
+  }, [fn, delay]);
+  
+  return debouncedFn;
+}
 
 // Define filter option type for languages and tags
 type FilterOption = {
@@ -43,7 +58,7 @@ export default function AdvancedSearch({
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   
   // Debounce search term changes
-  const debouncedSearch = useDebouncedCallback((value: string) => {
+  const debouncedSearch = useDebounce((value: string) => {
     onSearchChange(value);
   }, 300);
   
