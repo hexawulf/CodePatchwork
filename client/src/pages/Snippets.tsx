@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
-import AdvancedSearch from "@/components/AdvancedSearch";
+import SimpleAdvancedSearch from "@/components/SimpleAdvancedSearch";
 import FilterBadges from "@/components/FilterBadges";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -154,7 +154,7 @@ export default function Snippets() {
       
       {/* Advanced Search and filter */}
       <div className="space-y-4 mb-6">
-        <AdvancedSearch
+        <SimpleAdvancedSearch
           onSearchChange={handleSearchChange}
           onLanguageChange={handleLanguageChange}
           onTagChange={handleTagChange}
