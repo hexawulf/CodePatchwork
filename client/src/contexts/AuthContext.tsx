@@ -150,7 +150,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function signInWithGoogle(): Promise<User> {
     try {
-      // Use the already created and exported googleProvider from firebase.ts
+      console.log("Starting Google sign-in process...");
+      
+      // Check if Firebase is properly initialized
+      if (!auth || !googleProvider) {
+        throw new Error("Firebase authentication is not properly initialized");
+      }
+      
       // Configure it for this specific sign-in attempt
       googleProvider.setCustomParameters({
         prompt: 'select_account'
@@ -177,6 +183,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         errorMessage = 'The sign-in popup was closed before completing the process.';
       } else if (error.code === 'auth/cancelled-popup-request') {
         errorMessage = 'The operation was cancelled.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = 'This domain is not authorized for Google sign-in. Please add this domain to your Firebase console under Authentication > Settings > Authorized domains.';
+      } else if (error.code === 'auth/configuration-not-found') {
+        errorMessage = 'Firebase configuration error. Please try email/password login or contact support.';
       } else if (error.message) {
         errorMessage = error.message;
       }
