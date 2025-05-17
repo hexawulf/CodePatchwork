@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
+import ForgotPasswordForm from './ForgotPasswordForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -103,17 +104,7 @@ export default function AuthDialog({
         )}
 
         {mode === 'forgot-password' && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email address and we'll send you a link to reset your password.
-            </p>
-            {/* Implement the forgot password form here */}
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={handleBackToLogin}>
-                Back to Login
-              </Button>
-            </div>
-          </div>
+          <ForgotPasswordForm onBackToLogin={handleBackToLogin} />
         )}
       </DialogContent>
     </Dialog>
