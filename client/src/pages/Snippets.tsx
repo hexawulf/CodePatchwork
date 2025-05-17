@@ -144,10 +144,7 @@ export default function Snippets() {
               <List className="h-5 w-5" />
             </Button>
             
-            <Button className="h-9 ml-2" onClick={handleAddSnippet}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Snippet
-            </Button>
+            {/* New Snippet button removed to prevent duplication */}
           </div>
         </div>
       </div>
