@@ -431,7 +431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/collections/:collectionId/snippets/:snippetId", async (req, res) => {
+  app.delete("/api/collections/:collectionId/snippets/:snippetId", authMiddleware, async (req, res) => {
     try {
       const collectionId = parseInt(req.params.collectionId);
       const snippetId = parseInt(req.params.snippetId);
@@ -468,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/snippets/:id/share", async (req, res) => {
+  app.post("/api/snippets/:id/share", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -490,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/snippets/:id/publish", async (req, res) => {
+  app.post("/api/snippets/:id/publish", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -525,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/snippets/:snippetId/comments", async (req, res) => {
+  app.post("/api/snippets/:snippetId/comments", authMiddleware, async (req, res) => {
     try {
       const snippetId = parseInt(req.params.snippetId);
       
@@ -556,7 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put("/api/comments/:id", async (req, res) => {
+  app.put("/api/comments/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -569,7 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/comments/:id", async (req, res) => {
+  app.delete("/api/comments/:id", authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
