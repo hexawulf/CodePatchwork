@@ -178,11 +178,13 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
         )}
         
         <div className="mb-3 flex flex-wrap gap-1">
-          <span 
-            className="text-xs py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
-          >
-            {snippet.language}
-          </span>
+          {snippet.language && (
+            <span 
+              className="text-xs py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
+            >
+              {snippet.language}
+            </span>
+          )}
           
           {snippet.tags && snippet.tags.map(tag => (
             <span 
