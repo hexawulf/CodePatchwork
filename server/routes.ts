@@ -5,11 +5,63 @@ import {
   insertSnippetSchema, 
   insertCollectionSchema, 
   insertCollectionItemSchema,
-  insertCommentSchema 
+  insertCommentSchema,
+  insertUserSchema
 } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Firebase Auth endpoints
+  app.post("/api/auth/user", async (req, res) => {
+    try {
+      // This endpoint will be called by the frontend after Firebase authentication
+      const { uid, email, displayName, photoURL } = req.body;
+      
+      if (!uid) {
+        return res.status(400).json({ message: "User ID (uid) is required" });
+      }
+      
+      // Upsert the user in our database
+      const user = await storage.upsertUser({
+        id: uid,
+        email: email || null,
+        displayName: displayName || null,
+        photoURL: photoURL || null
+      });
+      
+      res.status(201).json(user);
+    } catch (error) {
+      console.error("Error creating/updating user:", error);
+      res.status(500).json({ message: "Failed to create/update user" });
+    }
+  });
+  
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      // This would be better with proper auth middleware
+      // For now, we just check if the Firebase UID is provided in the Authorization header
+      const authHeader = req.headers.authorization;
+      
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const uid = authHeader.split(' ')[1];
+      if (!uid) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const user = await storage.getUser(uid);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+      res.status(500).json({ message: "Failed to fetch user data" });
+    }
+  });
   // Snippets endpoints
   app.get("/api/snippets", async (req, res) => {
     try {
