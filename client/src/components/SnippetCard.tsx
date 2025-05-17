@@ -3,8 +3,10 @@ import { type Snippet } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Star, Copy, MoreVertical, Pencil, Trash2, FolderPlus } from "lucide-react";
+import { Star, Copy, MoreVertical, Pencil, Trash2, FolderPlus, Share2, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import CodeBlock from "./CodeBlock";
 import { useSnippetContext } from "@/contexts/SnippetContext";
 import AddSnippetDialog from "./AddSnippetDialog";
@@ -36,9 +38,12 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   // Use the context for all operations
   const { toggleFavorite, deleteSnippet } = useSnippetContext();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCollectionDialogOpen, setIsCollectionDialogOpen] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isTogglePublic, setIsTogglePublic] = useState(false);
   
   // Function to get language color
   const getLanguageColor = (language?: string) => {
@@ -114,6 +119,64 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
     }
   };
   
+  // Function to handle sharing
+  const handleShare = async () => {
+    try {
+      setIsSharing(true);
+      const response = await apiRequest<{shareId: string}>(`/api/snippets/${snippet.id}/share`, {
+        method: 'POST'
+      }) as {shareId: string};
+      
+      if (response.shareId) {
+        const shareUrl = `${window.location.origin}/shared/${response.shareId}`;
+        await navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Share link created!",
+          description: "The share link has been copied to your clipboard.",
+        });
+        
+        // Invalidate cache to refresh snippet with new shareId
+        queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
+      }
+    } catch (error) {
+      toast({
+        title: "Sharing failed",
+        description: "Could not create a share link. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSharing(false);
+    }
+  };
+  
+  // Function to toggle public access
+  const handleTogglePublic = async () => {
+    try {
+      setIsTogglePublic(true);
+      const updatedSnippet = await apiRequest<Snippet>(`/api/snippets/${snippet.id}/publish`, {
+        method: 'POST'
+      }) as Snippet;
+      
+      toast({
+        title: updatedSnippet.isPublic ? "Snippet published" : "Snippet unpublished",
+        description: updatedSnippet.isPublic 
+          ? "Anyone with the link can now view this snippet." 
+          : "This snippet is now private.",
+      });
+      
+      // Invalidate cache to refresh snippet with updated isPublic status
+      queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update visibility. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTogglePublic(false);
+    }
+  };
+  
   return (
     <div className={cn(
       "bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200",
@@ -152,6 +215,19 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
                 <DropdownMenuItem onClick={copyToClipboard}>
                   <Copy className="h-4 w-4 mr-2" />
                   Copy code
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleShare} disabled={isSharing}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  {isSharing ? "Creating share link..." : "Share"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleTogglePublic} disabled={isTogglePublic}>
+                  <Globe className="h-4 w-4 mr-2" />
+                  {isTogglePublic 
+                    ? "Updating..." 
+                    : snippet.isPublic 
+                      ? "Make private" 
+                      : "Make public"
+                  }
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsCollectionDialogOpen(true)}>
                   <FolderPlus className="h-4 w-4 mr-2" />

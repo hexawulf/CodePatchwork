@@ -1,7 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSnippetSchema, insertCollectionSchema, insertCollectionItemSchema } from "@shared/schema";
+import { 
+  insertSnippetSchema, 
+  insertCollectionSchema, 
+  insertCollectionItemSchema,
+  insertCommentSchema 
+} from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -371,6 +376,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error removing snippet from collection:", error);
       res.status(500).json({ message: "Failed to remove snippet from collection" });
+    }
+  });
+
+  // Sharing endpoints
+  app.get("/api/shared/:shareId", async (req, res) => {
+    try {
+      const { shareId } = req.params;
+      const snippet = await storage.getSnippetByShareId(shareId);
+      
+      if (!snippet) {
+        return res.status(404).json({ message: "Shared snippet not found" });
+      }
+      
+      if (!snippet.isPublic) {
+        return res.status(403).json({ message: "This snippet is not publicly accessible" });
+      }
+      
+      // Increment the view count for the shared snippet
+      await storage.incrementSnippetViewCount(snippet.id);
+      
+      res.json(snippet);
+    } catch (error) {
+      console.error("Error fetching shared snippet:", error);
+      res.status(500).json({ message: "Failed to fetch shared snippet" });
+    }
+  });
+  
+  app.post("/api/snippets/:id/share", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const snippet = await storage.getSnippet(id);
+      if (!snippet) {
+        return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      // Generate a share ID if one doesn't exist already
+      let shareId = snippet.shareId;
+      if (!shareId) {
+        shareId = await storage.generateShareId(id);
+      }
+      
+      res.json({ shareId });
+    } catch (error) {
+      console.error("Error sharing snippet:", error);
+      res.status(500).json({ message: "Failed to share snippet" });
+    }
+  });
+  
+  app.post("/api/snippets/:id/publish", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const snippet = await storage.getSnippet(id);
+      if (!snippet) {
+        return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      const updatedSnippet = await storage.toggleSnippetPublic(id);
+      res.json(updatedSnippet);
+    } catch (error) {
+      console.error("Error toggling snippet public status:", error);
+      res.status(500).json({ message: "Failed to update snippet public status" });
+    }
+  });
+  
+  // Comment endpoints
+  app.get("/api/snippets/:snippetId/comments", async (req, res) => {
+    try {
+      const snippetId = parseInt(req.params.snippetId);
+      
+      const snippet = await storage.getSnippet(snippetId);
+      if (!snippet) {
+        return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      const comments = await storage.getCommentsBySnippetId(snippetId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+  
+  app.post("/api/snippets/:snippetId/comments", async (req, res) => {
+    try {
+      const snippetId = parseInt(req.params.snippetId);
+      
+      const snippet = await storage.getSnippet(snippetId);
+      if (!snippet) {
+        return res.status(404).json({ message: "Snippet not found" });
+      }
+      
+      // Combine snippet ID with the comment data from the body
+      const commentData = {
+        ...req.body,
+        snippetId
+      };
+      
+      const parsedBody = insertCommentSchema.parse(commentData);
+      const comment = await storage.createComment(parsedBody);
+      
+      res.status(201).json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid comment data", 
+          errors: error.errors 
+        });
+      }
+      console.error("Error creating comment:", error);
+      res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+  
+  app.put("/api/comments/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // For simplicity, we'll allow partial updates to comments
+      const updatedComment = await storage.updateComment(id, req.body);
+      res.json(updatedComment);
+    } catch (error) {
+      console.error("Error updating comment:", error);
+      res.status(500).json({ message: "Failed to update comment" });
+    }
+  });
+  
+  app.delete("/api/comments/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      await storage.deleteComment(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      res.status(500).json({ message: "Failed to delete comment" });
     }
   });
 
