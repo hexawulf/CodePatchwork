@@ -2,12 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { debounce } from "@/lib/utils";
 import { useSnippetContext } from "@/contexts/SnippetContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function SearchBar() {
   // Use the global snippet context for search
   const { searchTerm, setSearchTerm } = useSnippetContext();
   const [inputValue, setInputValue] = useState(searchTerm || "");
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Get query client for manual invalidation
+  const queryClient = useQueryClient();
   
   // Update search term with proper debounce
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,8 +35,13 @@ export default function SearchBar() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      console.log("Search submitted with:", inputValue);
+      
       // Immediately apply the search without waiting for debounce
       setSearchTerm(inputValue);
+      
+      // Force refetch of all search-related queries
+      queryClient.invalidateQueries();
       
       // Clear any pending timeout
       if (searchTimeout) {
