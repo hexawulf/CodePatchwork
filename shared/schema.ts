@@ -1,16 +1,19 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  id: varchar("id").primaryKey(), // Firebase UID
+  email: text("email").unique(),
+  displayName: text("display_name"),
+  photoURL: text("photo_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertUserSchema = createInsertSchema(users).omit({
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -24,7 +27,7 @@ export const snippets = pgTable("snippets", {
   code: text("code").notNull(),
   language: text("language").notNull(),
   tags: text("tags").array(),
-  userId: integer("user_id"),
+  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   viewCount: integer("view_count").default(0),
@@ -50,7 +53,7 @@ export const collections = pgTable("collections", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  userId: integer("user_id"),
+  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -87,7 +90,7 @@ export const comments = pgTable("comments", {
   content: text("content").notNull(),
   authorName: text("author_name").notNull(), // For guest comments without authentication
   authorEmail: text("author_email"), // Optional email for notifications
-  userId: integer("user_id"), // For authenticated users (will be used later)
+  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
