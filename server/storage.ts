@@ -773,15 +773,22 @@ export class DatabaseStorage implements IStorage {
   async createSnippet(snippet: InsertSnippet): Promise<Snippet> {
     const { db } = await import('./db');
     const now = new Date();
-    const snippetWithDefaults = {
-      ...snippet,
-      createdAt: now,
-      updatedAt: now,
-      viewCount: snippet.viewCount || 0,
-      isFavorite: snippet.isFavorite || false
+    
+    // Ensure we only include valid fields from our schema
+    const snippetToInsert = {
+      title: snippet.title,
+      code: snippet.code,
+      language: snippet.language,
+      description: snippet.description || null,
+      tags: snippet.tags || null,
+      userId: snippet.userId || null,
+      isFavorite: snippet.isFavorite || false,
+      // These fields are handled automatically by defaults
+      // createdAt and updatedAt are set by defaultNow()
+      // viewCount is set by default(0)
     };
     
-    const result = await db.insert(snippets).values(snippetWithDefaults).returning();
+    const result = await db.insert(snippets).values(snippetToInsert).returning();
     return result[0];
   }
 
@@ -1046,4 +1053,5 @@ export class DatabaseStorage implements IStorage {
 
 // Create an instance of DatabaseStorage to use throughout the application
 // Using in-memory storage for now until database issues are resolved
-export const storage = new MemStorage();
+// Switch to database storage for persistent data
+export const storage = new DatabaseStorage();
