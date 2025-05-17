@@ -1,31 +1,60 @@
 import { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { debounce } from "@/lib/utils";
+import { useSnippetContext } from "@/contexts/SnippetContext";
 
 export default function SearchBar() {
-  // Temporary local state for search while fixing context
-  const [searchTerm, setSearchTerm] = useState("");
-  const [inputValue, setInputValue] = useState("");
+  // Use the global snippet context for search
+  const { searchTerm, setSearchTerm } = useSnippetContext();
+  const [inputValue, setInputValue] = useState(searchTerm || "");
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   
-  // Debounce the search term update to prevent too many API calls
-  const debouncedSetSearchTerm = useCallback(
-    debounce((value) => {
-      setSearchTerm(value);
-    }, 300),
-    [setSearchTerm]
-  );
-  
-  // Update search term when input changes
+  // Update search term with proper debounce
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputValue(value);
-    debouncedSetSearchTerm(value);
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Set new debounce timeout
+    const newTimeout = setTimeout(() => {
+      setSearchTerm(value);
+    }, 300);
+    
+    setSearchTimeout(newTimeout);
+  };
+  
+  // Handle Enter key press for immediate search
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Immediately apply the search without waiting for debounce
+      setSearchTerm(inputValue);
+      
+      // Clear any pending timeout
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        setSearchTimeout(null);
+      }
+    }
   };
 
   // Update input value when searchTerm changes externally
   useEffect(() => {
-    setInputValue(searchTerm);
+    setInputValue(searchTerm || "");
   }, [searchTerm]);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
 
   return (
     <div className="relative">
@@ -34,6 +63,7 @@ export default function SearchBar() {
         placeholder="Search snippets..." 
         value={inputValue}
         onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
         className="w-full py-2 pl-10 pr-4 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
       />
       <div className="absolute left-3 top-2.5 text-slate-400">
