@@ -40,7 +40,7 @@ export function useSnippets({ search, languages, tags, favoritesOnly }: UseSnipp
   const queryUrl = queryString ? `/api/snippets?${queryString}` : "/api/snippets";
   
   // Fetch snippets with filters
-  const { data, isLoading, error } = useQuery<Snippet[]>({
+  const { data, isLoading, error, refetch } = useQuery<Snippet[]>({
     queryKey: [queryUrl],
     retry: 1
   });
@@ -49,5 +49,6 @@ export function useSnippets({ search, languages, tags, favoritesOnly }: UseSnipp
     snippets: data || [],
     isLoading,
     error,
+    refetch,
   };
 }
