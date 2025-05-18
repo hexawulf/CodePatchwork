@@ -156,4 +156,4 @@ For questions or support, please open an issue on the GitHub repository.
 
 ---
 
-Made with ❤️ by [hexawolf](https://github.com/hexawolf)
+Made with ❤️ by [hexawulf](https://github.com/hexawulf)
