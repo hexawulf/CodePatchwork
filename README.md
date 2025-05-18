@@ -2,7 +2,7 @@
 
 A visual code snippet manager that combines the visual appeal of Pinterest with the functionality of GitHub Gists. CodePatchwork transforms how developers manage code snippets by replacing scattered text files and notes with a visually appealing, searchable repository.
 
-![CodePatchwork Banner](./public/codepatchwork-banner.png)
+![CodePatchwork Banner](codepatchwork-banner.png)
 
 ## ✨ Features
 
