@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, Plus, Sun, Moon, Upload, Download, Info } from "lucide-react";
+import { Menu, Plus, Sun, Moon, Upload, Download, Info, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,8 +11,10 @@ import SearchBar from "./SearchBar";
 import AddSnippetDialog from "./AddSnippetDialog";
 import ImportExportDialog from "./ImportExportDialog";
 import GlobalCodeThemeSelector from "./GlobalCodeThemeSelector";
-import UserProfileButton from "./UserProfileButton";
+// Temporarily disable UserProfileButton due to auth context issues
+// import UserProfileButton from "./UserProfileButton";
 import AboutModal from "./AboutModal";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface HeaderProps {
   toggleMobileMenu: () => void;
@@ -143,7 +145,14 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
             </Button>
           </div>
           
-          <UserProfileButton />
+          {/* Temporarily replace UserProfileButton with a placeholder */}
+          <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback>
+                <User className="h-5 w-5" />
+              </AvatarFallback>
+            </Avatar>
+          </Button>
         </div>
       </header>
       
