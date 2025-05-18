@@ -22,7 +22,7 @@ This guide provides step-by-step instructions for migrating CodePatchwork from R
 ## Step 2: Clone the Repository Locally
 
 ```bash
-git clone https://github.com/hexawolf/CodePatchwork.git
+git clone https://github.com/hexawulf/CodePatchwork.git
 cd CodePatchwork
 ```
 
@@ -51,7 +51,7 @@ There are two approaches to export your code from Replit:
 git init
 git add .
 git commit -m "Initial commit: CodePatchwork v1.0"
-git remote add origin https://github.com/hexawolf/CodePatchwork.git
+git remote add origin https://github.com/hexawulf/CodePatchwork.git
 ```
 
 ## Step 4: Push to GitHub
@@ -88,7 +88,7 @@ Make sure your `package.json` has the correct repository information:
 ```json
 "repository": {
   "type": "git",
-  "url": "https://github.com/hexawolf/CodePatchwork.git"
+  "url": "https://github.com/hexawulf/CodePatchwork.git"
 },
 "author": "0xWulf <dev@0xwulf.dev>",
 "license": "MIT",

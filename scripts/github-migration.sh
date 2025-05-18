@@ -32,11 +32,11 @@ git commit -m "Initial commit: CodePatchwork v1.0"
 if git remote | grep -q "origin"; then
   # Update remote if it exists
   echo "🔄 Updating remote origin..."
-  git remote set-url origin https://github.com/hexawolf/CodePatchwork.git
+  git remote set-url origin https://github.com/hexawulf/CodePatchwork.git
 else
   # Add remote if it doesn't exist
   echo "🔗 Adding remote origin..."
-  git remote add origin https://github.com/hexawolf/CodePatchwork.git
+  git remote add origin https://github.com/hexawulf/CodePatchwork.git
 fi
 
 # Display next steps

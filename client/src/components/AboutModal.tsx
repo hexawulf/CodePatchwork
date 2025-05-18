@@ -83,7 +83,7 @@ export default function AboutModal({ open, onOpenChange }: AboutModalProps) {
               <p>Author: 0xWulf</p>
               <p>Email: dev@0xwulf.dev</p>
               <a 
-                href="https://github.com/hexawolf/CodePatchwork" 
+                href="https://github.com/hexawulf/CodePatchwork" 
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline"
