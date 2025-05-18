@@ -156,8 +156,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function signInWithGoogle(): Promise<User> {
     try {
-      console.log("Starting Google sign-in process...");
-      
       // Ensure Firebase auth is available
       if (!auth) {
         throw new Error("Firebase authentication is not available");
@@ -179,15 +177,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Use popup for mobile compatibility
       const result = await signInWithPopup(auth, provider);
       
-      // Log success info (for debugging)
-      console.log("Google sign in successful");
-      
       // Register with our backend
       await registerUserWithBackend(result.user);
       return result.user;
     } catch (error: any) {
-      console.error("Google sign in error:", error);
-      
       // Provide a more user-friendly error message
       let errorMessage = 'An error occurred during Google sign in';
       
