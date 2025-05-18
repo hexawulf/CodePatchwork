@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, Plus, Sun, Moon, Upload, Download } from "lucide-react";
+import { Menu, Plus, Sun, Moon, Upload, Download, Info } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import AddSnippetDialog from "./AddSnippetDialog";
 import ImportExportDialog from "./ImportExportDialog";
 import GlobalCodeThemeSelector from "./GlobalCodeThemeSelector";
 import UserProfileButton from "./UserProfileButton";
+import AboutModal from "./AboutModal";
 
 interface HeaderProps {
   toggleMobileMenu: () => void;
@@ -33,6 +34,7 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
   // Managing dialog states
   const [snippetDialogOpen, setSnippetDialogOpen] = useState(false);
   const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
+  const [aboutModalOpen, setAboutModalOpen] = useState(false);
   
   const openCreateModal = () => {
     setSnippetDialogOpen(true);
@@ -40,6 +42,10 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
   
   const openImportModal = () => {
     setImportExportDialogOpen(true);
+  };
+
+  const openAboutModal = () => {
+    setAboutModalOpen(true);
   };
   
   return (
@@ -72,6 +78,16 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
             ) : (
               <Moon className="h-6 w-6" />
             )}
+          </button>
+          
+          {/* About button */}
+          <button
+            type="button"
+            onClick={openAboutModal}
+            className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md"
+            aria-label="About CodePatchwork"
+          >
+            <Info className="h-6 w-6" />
           </button>
           
           {/* Add Snippet Dialog - This is the single place to add new snippets */}
@@ -141,6 +157,9 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
       
       {/* Import/Export Dialog */}
       <ImportExportDialog open={importExportDialogOpen} onOpenChange={setImportExportDialogOpen} />
+      
+      {/* About Modal */}
+      <AboutModal open={aboutModalOpen} onOpenChange={setAboutModalOpen} />
     </>
   );
 }
