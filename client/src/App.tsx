@@ -17,6 +17,7 @@ import Tags from "@/pages/Tags";
 import Settings from "@/pages/Settings";
 import SharedSnippet from "@/pages/SharedSnippet";
 import { useEffect } from "react";
+import { DebugEnv } from './components/Debug';
 
 function Router() {
   return (
@@ -64,7 +65,8 @@ function App() {
           </CodeThemeProvider>
         </ThemeProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    <DebugEnv />
+  </QueryClientProvider>
   );
 }
 

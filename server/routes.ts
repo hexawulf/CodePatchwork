@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { simpleStorage } from "./simple-storage"; // Add this import
 import { 
   insertSnippetSchema, 
   insertCollectionSchema, 
@@ -9,6 +10,23 @@ import {
   insertUserSchema
 } from "@shared/schema";
 import { z } from "zod";
+import { pool } from './db'; // Add this import
+
+// Debug database connection
+(async () => {
+  try {
+    const client = await pool.connect();
+    console.log("✅ DATABASE CONNECTION TEST: Successfully connected to database!");
+    
+    // Test a simple query
+    const result = await client.query('SELECT NOW() as time');
+    console.log("✅ DATABASE CONNECTION TEST: Database time:", result.rows[0].time);
+    
+    client.release();
+  } catch (error) {
+    console.error("❌ DATABASE CONNECTION TEST: Failed to connect:", error);
+  }
+})();
 
 // Auth middleware to verify Firebase authentication tokens
 const authMiddleware: RequestHandler = async (req, res, next) => {
@@ -75,10 +93,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch user data" });
     }
   });
-  // Snippets endpoints
+
+  // Snippets endpoints - UPDATED
   app.get("/api/snippets", async (req, res) => {
     try {
-      const search = req.query.search as string | undefined;
+      console.log("SNIPPETS API: Starting request");
       
       // Create a filter object for our storage methods
       const filters: {
@@ -89,8 +108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = {};
       
       // Add search filter if provided
-      if (search) {
-        filters.search = search;
+      if (req.query.search) {
+        filters.search = req.query.search as string;
+        console.log("SNIPPETS API: Adding search filter:", filters.search);
       }
       
       // Handle language filter
@@ -98,6 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.language = Array.isArray(req.query.language) 
           ? req.query.language as string[] 
           : req.query.language as string;
+        console.log("SNIPPETS API: Adding language filter:", filters.language);
       }
       
       // Handle tag filter
@@ -105,54 +126,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.tag = Array.isArray(req.query.tag)
           ? req.query.tag as string[]
           : req.query.tag as string;
+        console.log("SNIPPETS API: Adding tag filter:", filters.tag);
       }
       
       // Handle favorites filter
       if (req.query.favorites === 'true') {
         filters.favorites = true;
+        console.log("SNIPPETS API: Adding favorites filter");
       }
       
-      const snippets = await storage.getSnippets(filters);
-      res.json(snippets);
+      // Try with simple storage first
+      try {
+        console.log("SNIPPETS API: Trying with simple storage");
+        const snippets = await simpleStorage.getSnippets(filters);
+        console.log(`SNIPPETS API: Successfully retrieved ${snippets.length} snippets with simple storage`);
+        return res.json(snippets);
+      } catch (simpleError) {
+        console.error("SNIPPETS API: Simple storage failed:", simpleError);
+        
+        // Fall back to regular storage
+        console.log("SNIPPETS API: Falling back to regular storage");
+        const snippets = await storage.getSnippets(filters);
+        console.log(`SNIPPETS API: Successfully retrieved ${snippets.length} snippets with regular storage`);
+        res.json(snippets);
+      }
     } catch (error) {
-      console.error("Error fetching snippets:", error);
-      res.status(500).json({ message: "Failed to fetch snippets" });
+      console.error("SNIPPETS API ERROR:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      res.status(500).json({ 
+        message: "Failed to fetch snippets", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
   // Export endpoint MUST be defined BEFORE the :id route to avoid conflict
   app.get("/api/snippets/export", async (req, res) => {
     try {
-      // For export, we'll get all snippets without filters for simplicity
-      const snippets = await storage.getSnippets();
+      console.log("EXPORT API: Starting request");
       
-      // Format for download
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
-      
-      res.json(snippets);
+      // Try with simple storage first
+      try {
+        console.log("EXPORT API: Trying with simple storage");
+        const snippets = await simpleStorage.getSnippets();
+        console.log(`EXPORT API: Successfully retrieved ${snippets.length} snippets for export`);
+        
+        // Format for download
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
+        
+        return res.json(snippets);
+      } catch (simpleError) {
+        console.error("EXPORT API: Simple storage failed:", simpleError);
+        
+        // Fall back to regular storage
+        console.log("EXPORT API: Falling back to regular storage");
+        const snippets = await storage.getSnippets();
+        console.log(`EXPORT API: Successfully retrieved ${snippets.length} snippets with regular storage`);
+        
+        // Format for download
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
+        
+        res.json(snippets);
+      }
     } catch (error) {
-      console.error("Error exporting snippets:", error);
-      res.status(500).json({ message: "Failed to export snippets" });
+      console.error("EXPORT API ERROR:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      res.status(500).json({ 
+        message: "Failed to export snippets", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
-  // Individual snippet route
+  // Individual snippet route - UPDATED
   app.get("/api/snippets/:id", async (req, res) => {
     try {
+      console.log("INDIVIDUAL SNIPPET API: Starting request for id:", req.params.id);
       const id = parseInt(req.params.id);
-      const snippet = await storage.getSnippet(id);
       
-      if (!snippet) {
-        return res.status(404).json({ message: "Snippet not found" });
+      // Try with simple storage first
+      try {
+        console.log("INDIVIDUAL SNIPPET API: Trying with simple storage");
+        const snippet = await simpleStorage.getSnippet(id);
+        
+        if (!snippet) {
+          console.log(`INDIVIDUAL SNIPPET API: No snippet found with id ${id}`);
+          return res.status(404).json({ message: "Snippet not found" });
+        }
+        
+        // Increment view count
+        await simpleStorage.incrementSnippetViewCount(id);
+        console.log(`INDIVIDUAL SNIPPET API: Successfully retrieved snippet ${id} with simple storage`);
+        return res.json(snippet);
+      } catch (simpleError) {
+        console.error("INDIVIDUAL SNIPPET API: Simple storage failed:", simpleError);
+        
+        // Fall back to regular storage
+        console.log("INDIVIDUAL SNIPPET API: Falling back to regular storage");
+        const snippet = await storage.getSnippet(id);
+        
+        if (!snippet) {
+          console.log(`INDIVIDUAL SNIPPET API: No snippet found with id ${id}`);
+          return res.status(404).json({ message: "Snippet not found" });
+        }
+        
+        // Increment view count
+        await storage.incrementSnippetViewCount(id);
+        console.log(`INDIVIDUAL SNIPPET API: Successfully retrieved snippet ${id} with regular storage`);
+        res.json(snippet);
       }
-      
-      // Increment view count
-      await storage.incrementSnippetViewCount(id);
-      res.json(snippet);
     } catch (error) {
-      console.error("Error fetching snippet:", error);
-      res.status(500).json({ message: "Failed to fetch snippet" });
+      console.error("INDIVIDUAL SNIPPET API ERROR:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      res.status(500).json({ 
+        message: "Failed to fetch snippet", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
@@ -250,25 +350,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all languages
+  // Get all languages - UPDATED
   app.get("/api/languages", async (req, res) => {
     try {
-      const languages = await storage.getLanguages();
-      res.json(languages);
+      console.log("LANGUAGES API: Starting request");
+      
+      // Try with simple storage first
+      try {
+        console.log("LANGUAGES API: Trying with simple storage");
+        const languages = await simpleStorage.getLanguages();
+        console.log("LANGUAGES API: Successfully retrieved languages with simple storage:", languages);
+        return res.json(languages);
+      } catch (simpleError) {
+        console.error("LANGUAGES API: Simple storage failed:", simpleError);
+        
+        // Fall back to regular storage
+        console.log("LANGUAGES API: Falling back to regular storage");
+        const languages = await storage.getLanguages();
+        console.log("LANGUAGES API: Successfully retrieved languages with regular storage:", languages);
+        res.json(languages);
+      }
     } catch (error) {
-      console.error("Error fetching languages:", error);
-      res.status(500).json({ message: "Failed to fetch languages" });
+      console.error("LANGUAGES API ERROR:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      res.status(500).json({ 
+        message: "Failed to fetch languages", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
-  // Get all tags
+  // Get all tags - UPDATED
   app.get("/api/tags", async (req, res) => {
     try {
-      const tags = await storage.getTags();
-      res.json(tags);
+      console.log("TAGS API: Starting request");
+      
+      // Try with simple storage first
+      try {
+        console.log("TAGS API: Trying with simple storage");
+        const tags = await simpleStorage.getTags();
+        console.log("TAGS API: Successfully retrieved tags with simple storage:", tags);
+        return res.json(tags);
+      } catch (simpleError) {
+        console.error("TAGS API: Simple storage failed:", simpleError);
+        
+        // Fall back to regular storage
+        console.log("TAGS API: Falling back to regular storage");
+        const tags = await storage.getTags();
+        console.log("TAGS API: Successfully retrieved tags with regular storage:", tags);
+        res.json(tags);
+      }
     } catch (error) {
-      console.error("Error fetching tags:", error);
-      res.status(500).json({ message: "Failed to fetch tags" });
+      console.error("TAGS API ERROR:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      res.status(500).json({ 
+        message: "Failed to fetch tags", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
@@ -312,31 +456,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Move export endpoint BEFORE the /:id parameter route to avoid route conflicts
-  app.get("/api/snippets/export", async (req, res) => {
-    try {
-      // For export, we'll get all snippets without filters for simplicity
-      const snippets = await storage.getSnippets();
-      
-      // Format for download
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
-      
-      res.json(snippets);
-    } catch (error) {
-      console.error("Error exporting snippets:", error);
-      res.status(500).json({ message: "Failed to export snippets" });
-    }
-  });
-  
-  // Collections endpoints
+  // Collections endpoints - UPDATED
   app.get("/api/collections", async (req, res) => {
     try {
-      const collections = await storage.getCollections();
-      res.json(collections);
+      console.log("COLLECTIONS API: Starting request");
+      
+      // Try with simple storage first
+      try {
+        console.log("COLLECTIONS API: Trying with simple storage");
+        const collections = await simpleStorage.getCollections();
+        console.log(`COLLECTIONS API: Successfully retrieved ${collections.length} collections with simple storage`);
+        return res.json(collections);
+      } catch (simpleError) {
+        console.error("COLLECTIONS API: Simple storage failed:", simpleError);
+        
+        // Fall back to regular storage
+        console.log("COLLECTIONS API: Falling back to regular storage");
+        const collections = await storage.getCollections();
+        console.log(`COLLECTIONS API: Successfully retrieved ${collections.length} collections with regular storage`);
+        res.json(collections);
+      }
     } catch (error) {
-      console.error("Error fetching collections:", error);
-      res.status(500).json({ message: "Failed to fetch collections" });
+      console.error("COLLECTIONS API ERROR:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      res.status(500).json({ 
+        message: "Failed to fetch collections", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 

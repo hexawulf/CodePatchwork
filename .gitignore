@@ -1,3 +1,8 @@
+# Temporary config files with credentials
+**/temp-firebase-config.ts
+**/temp-firebase-config.js
+**/firebase-config-temp.*
+
 # Dependencies
 node_modules
 .pnp
@@ -60,7 +65,6 @@ firebase-debug.*.log*
 ui-debug.*.log*
 .firebase/
 firebase-adminsdk.json
-
 # Drizzle
 .drizzle
 drizzle-studio.db

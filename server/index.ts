@@ -1,70 +1,163 @@
-import express, { type Request, Response, NextFunction } from "express";
+/* ------------------------------------------------------------------
+ * server/index.ts  –  Express bootstrap for CodePatchwork
+ * ------------------------------------------------------------------ */
+
+import dotenv from "dotenv";
+dotenv.config();
+
+import fs from "fs";
+import path from "path";
+import admin from "firebase-admin";
+import express, { Request, Response, NextFunction } from "express";
+import camelCase from "camelcase";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+////////////////////////////////////////////////////////////////////////////////
+// 0. Verify & load your service-account JSON
+////////////////////////////////////////////////////////////////////////////////
+const svcPath = process.env.GOOGLE_APPLICATION_CREDENTIALS!;
+console.log("→ SERVICE ACCOUNT path:", svcPath);
+console.log("→ Exists on disk?       ", fs.existsSync(svcPath));
+if (!fs.existsSync(svcPath)) {
+  console.error("❌ service account JSON not found. Aborting.");
+  process.exit(1);
+}
+
+const serviceAccount = JSON.parse(
+  fs.readFileSync(svcPath, { encoding: "utf-8" })
+);
+
+////////////////////////////////////////////////////////////////////////////////
+// 1. Initialize Firebase Admin with explicit cert
+////////////////////////////////////////////////////////////////////////////////
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// 2. Express + Body parsers
+////////////////////////////////////////////////////////////////////////////////
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+////////////////////////////////////////////////////////////////////////////////
+// 3. Security headers (CSP loosened + COOP/COEP off)
+////////////////////////////////////////////////////////////////////////////////
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://www.gstatic.com",
+        "https://apis.google.com",
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://fonts.googleapis.com",
+      ],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: [
+        "'self'",
+        "https://identitytoolkit.googleapis.com",
+        "https://securetoken.googleapis.com",
+        "https://www.googleapis.com",
+      ],
+      frameSrc: [
+        "https://accounts.google.com",
+        `https://${process.env.VITE_FIREBASE_AUTH_DOMAIN}`,
+      ],
+      imgSrc: ["'self'", "data:"],
+    },
+  }),
+  helmet.crossOriginOpenerPolicy({ policy: "unsafe-none" }),
+  helmet.crossOriginEmbedderPolicy({ policy: "unsafe-none" })
+);
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
+////////////////////////////////////////////////////////////////////////////////
+// 4. Normalize /api/snippets payload
+////////////////////////////////////////////////////////////////////////////////
+app.use("/api/snippets", (_req, res, next) => {
+  type Row = Record<string, unknown>;
+  const rename = { createdat: "createdAt", updatedat: "updatedAt" } as const;
+  const origJson = res.json.bind(res);
+
+  res.json = (body) => {
+    if (Array.isArray(body)) {
+      const fixed = body.map((row: Row) => {
+        const out: Row = {};
+        for (const [k, v] of Object.entries(row)) {
+          const key =
+            rename[k as keyof typeof rename] ?? camelCase(k);
+          out[key] =
+            (key === "createdAt" || key === "updatedAt") && v != null
+              ? new Date(v as string).toISOString()
+              : v;
+        }
+        return out;
+      });
+      return origJson(fixed);
+    }
+    return origJson(body as any);
+  };
+  next();
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// 5. Simple API logger
+////////////////////////////////////////////////////////////////////////////////
+app.use((req, res, next) => {
+  const t0 = Date.now();
+  let payload: any;
+  const orig = res.json.bind(res);
+
+  res.json = (body, ...args) => {
+    payload = body;
+    return orig(body, ...args);
   };
 
   res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
+    if (req.path.startsWith("/api")) {
+      const ms = Date.now() - t0;
+      let msg = `${req.method} ${req.path} ${res.statusCode} in ${ms}ms`;
+      if (payload) msg += ` :: ${JSON.stringify(payload)}`;
+      if (msg.length > 80) msg = msg.slice(0, 79) + "…";
+      log(msg);
     }
   });
 
   next();
 });
 
+////////////////////////////////////////////////////////////////////////////////
+// 6. Routes & error handler
+////////////////////////////////////////////////////////////////////////////////
 (async () => {
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  app.use(
+    (err: any, _req: Request, res: Response, _next: NextFunction) => {
+      console.error("[💥 ERROR]", err.stack || err);
+      res
+        .status(err.status || 500)
+        .json({ message: err.message || "Error" });
+    }
+  );
 
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  const port = Number(process.env.PORT) || 3001;
+  server.listen(
+    { host: "0.0.0.0", port, reusePort: true },
+    () => log(`🚀 Serving on port ${port}`)
+  );
 })();

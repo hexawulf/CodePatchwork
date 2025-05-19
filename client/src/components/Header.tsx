@@ -1,6 +1,15 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, Plus, Sun, Moon, Upload, Download, Info, User } from "lucide-react";
+import {
+  Menu,
+  Plus,
+  Sun,
+  Moon,
+  Upload,
+  Download,
+  Info,
+  User,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,132 +20,123 @@ import SearchBar from "./SearchBar";
 import AddSnippetDialog from "./AddSnippetDialog";
 import ImportExportDialog from "./ImportExportDialog";
 import GlobalCodeThemeSelector from "./GlobalCodeThemeSelector";
-// Temporarily disable UserProfileButton due to auth context issues
-// import UserProfileButton from "./UserProfileButton";
-import AboutModal from "./AboutModal";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+/* -------------  Firebase ---------------- */
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
+/* ---------------------------------------- */
+
+/* -------------  Lazy-load AboutModal ---- */
+const AboutModal = lazy(() => import("./AboutModal"));
+/* ---------------------------------------- */
 
 interface HeaderProps {
   toggleMobileMenu: () => void;
 }
 
 export default function Header({ toggleMobileMenu }: HeaderProps) {
-  // Temporarily use local state for theme while fixing context
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  /* theme toggle */
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    const next = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
   };
-  
-  // Managing dialog states
+
+  /* dialog state */
   const [snippetDialogOpen, setSnippetDialogOpen] = useState(false);
   const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
-  
-  const openCreateModal = () => {
-    setSnippetDialogOpen(true);
-  };
-  
-  const openImportModal = () => {
-    setImportExportDialogOpen(true);
+
+  /* login */
+  const handleLogin = async () => {
+    console.log("🚀 login clicked");
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (e: any) {
+      console.error("auth error", e.code, e.message);
+      alert(e.message); // remove once stable
+    }
   };
 
-  const openAboutModal = () => {
-    setAboutModalOpen(true);
-  };
-  
   return (
     <>
       <header className="bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-slate-700 py-3 px-4 flex justify-between items-center">
+        {/* mobile logo / burger */}
         <div className="flex items-center md:hidden">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={toggleMobileMenu}
             className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md"
           >
             <Menu className="h-6 w-6" />
           </button>
-          <span className="ml-2 font-semibold text-slate-800 dark:text-white">CodePatchwork</span>
+          <span className="ml-2 font-semibold text-slate-800 dark:text-white">
+            CodePatchwork
+          </span>
         </div>
-        
+
+        {/* desktop search */}
         <div className="max-w-lg w-full hidden md:block">
           <SearchBar />
         </div>
-        
+
+        {/* right-hand controls */}
         <div className="flex items-center space-x-4">
-          <button 
-            type="button" 
-            onClick={toggleTheme}
-            className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md"
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? (
-              <Sun className="h-6 w-6" />
-            ) : (
-              <Moon className="h-6 w-6" />
-            )}
-          </button>
-          
-          {/* About button */}
+          {/* theme */}
           <button
             type="button"
-            onClick={openAboutModal}
+            onClick={toggleTheme}
+            className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md"
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
+          </button>
+
+          {/* about */}
+          <button
+            type="button"
+            onClick={() => setAboutModalOpen(true)}
             className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md"
             aria-label="About CodePatchwork"
           >
             <Info className="h-6 w-6" />
           </button>
-          
-          {/* Add Snippet Dialog - This is the single place to add new snippets */}
-          {/* Desktop actions */}
+
+          {/* desktop extras */}
           <div className="hidden md:flex items-center space-x-2">
             <GlobalCodeThemeSelector />
             <AddSnippetDialog />
-            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="flex items-center"
-                >
+                <Button variant="outline" size="sm" className="flex items-center">
                   <Download className="h-4 w-4 mr-1" />
                   Import/Export
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={openImportModal}>
+                <DropdownMenuItem onClick={() => setImportExportDialogOpen(true)}>
                   <Upload className="h-4 w-4 mr-2" />
                   Import Snippets
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.location.href = "/api/snippets/export"}>
+                <DropdownMenuItem onClick={() => (window.location.href = "/api/snippets/export")}>
                   <Download className="h-4 w-4 mr-2" />
                   Export Snippets
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          
-          {/* Mobile actions */}
+
+          {/* mobile actions */}
           <div className="md:hidden flex items-center space-x-2">
             <GlobalCodeThemeSelector />
-            
-            <Button 
-              onClick={openCreateModal}
-              className="flex items-center"
-              size="sm"
-            >
+            <Button onClick={() => setSnippetDialogOpen(true)} size="sm" className="flex items-center">
               <Plus className="h-4 w-4 mr-1" />
               Add
             </Button>
-            
-            <Button 
-              onClick={openImportModal}
+            <Button
+              onClick={() => setImportExportDialogOpen(true)}
               variant="outline"
               size="icon"
               className="h-9 w-9"
@@ -144,9 +144,15 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
               <Download className="h-4 w-4" />
             </Button>
           </div>
-          
-          {/* Temporarily replace UserProfileButton with a placeholder */}
-          <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+
+          {/* login / avatar */}
+          <Button
+            id="login-btn"
+            onClick={handleLogin}
+            variant="ghost"
+            className="relative h-10 w-10 rounded-full"
+            aria-label="Sign in"
+          >
             <Avatar className="h-10 w-10">
               <AvatarFallback>
                 <User className="h-5 w-5" />
@@ -155,20 +161,21 @@ export default function Header({ toggleMobileMenu }: HeaderProps) {
           </Button>
         </div>
       </header>
-      
-      {/* Mobile search (appears below header on small screens) */}
+
+      {/* mobile search bar */}
       <div className="md:hidden p-2 bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-slate-700">
         <SearchBar />
       </div>
-      
-      {/* Mobile AddSnippetDialog - controlled by mobile button */}
+
+      {/* dialogs */}
       <AddSnippetDialog open={snippetDialogOpen} onOpenChange={setSnippetDialogOpen} />
-      
-      {/* Import/Export Dialog */}
       <ImportExportDialog open={importExportDialogOpen} onOpenChange={setImportExportDialogOpen} />
-      
-      {/* About Modal */}
-      <AboutModal open={aboutModalOpen} onOpenChange={setAboutModalOpen} />
+
+      {/* lazily-loaded About modal */}
+      <Suspense fallback={null}>
+        <AboutModal open={aboutModalOpen} onOpenChange={setAboutModalOpen} />
+      </Suspense>
     </>
   );
 }
+

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Fragment } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X } from 'lucide-react';
+import { X } from "lucide-react";
 
 interface AboutModalProps {
   open: boolean;
@@ -16,10 +16,10 @@ interface AboutModalProps {
 }
 
 export default function AboutModal({ open, onOpenChange }: AboutModalProps) {
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+  const today = new Date().toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 
   return (
@@ -28,77 +28,72 @@ export default function AboutModal({ open, onOpenChange }: AboutModalProps) {
         <DialogHeader>
           <DialogTitle className="text-center">About CodePatchwork</DialogTitle>
           <DialogDescription className="text-center">
-            A modern visual Code Snippet organization and transformation tool
+            A modern visual code-snippet manager
           </DialogDescription>
+
           <button
             onClick={() => onOpenChange(false)}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+            className="absolute right-4 top-4 rounded-sm p-1 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </button>
         </DialogHeader>
 
-        <div className="py-4">
-          <h2 className="text-xl font-semibold text-center text-primary">
-            CodePatchwork v1.0.0
-          </h2>
-          <p className="text-center text-muted-foreground text-sm mt-1">
-            Released {currentDate}
-          </p>
+        <section className="space-y-6 py-4 text-sm">
+          <Fragment>
+            <h2 className="text-xl font-semibold text-center text-primary">
+              CodePatchwork v1.0.0
+            </h2>
+            <p className="text-center text-muted-foreground">Released {today}</p>
+          </Fragment>
 
-          <div className="mt-6">
+          <Fragment>
             <h3 className="text-lg font-semibold">Overview</h3>
-            <p className="mt-2 text-sm">
-              CodePatchwork is a visual code snippet manager that combines the visual appeal of Pinterest with the functionality of GitHub Gists. It transforms how developers manage code snippets by replacing scattered text files and notes with a visually appealing, searchable repository.
+            <p>
+              CodePatchwork is a Pinterest-style, searchable repository for your
+              code snippets.
             </p>
-          </div>
+          </Fragment>
 
-          <div className="mt-6">
+          <Fragment>
             <h3 className="text-lg font-semibold">Key Features</h3>
-            <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
-              <li>Visual organization with Pinterest-style interface</li>
-              <li>Syntax highlighting for 100+ programming languages</li>
-              <li>Powerful search and filtering capabilities</li>
-              <li>Collections for organizing related snippets</li>
-              <li>Social sharing with customizable links</li>
-              <li>Tagging system for better discoverability</li>
-              <li>Google Authentication for secure access</li>
-              <li>Dark/Light mode for comfortable coding</li>
-              <li>Import/Export functionality</li>
-              <li>Responsive design for all devices</li>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>Visual board with drag &amp; drop</li>
+              <li>Syntax highlighting (100 + languages)</li>
+              <li>Tag &amp; search filters</li>
+              <li>Collections, import / export</li>
+              <li>Google sign-in, light / dark themes</li>
             </ul>
-          </div>
+          </Fragment>
 
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold">Technology</h3>
-            <p className="mt-2 text-sm">
-              Built with React, TypeScript, Express, PostgreSQL, and Firebase. Uses TailwindCSS for styling, Prism.js for code highlighting, and Drizzle ORM for database operations.
+          <Fragment>
+            <h3 className="text-lg font-semibold">Tech Stack</h3>
+            <p>
+              React · TypeScript · Express · PostgreSQL · Firebase · TailwindCSS ·
+              Prism.js · Drizzle ORM
             </p>
-          </div>
+          </Fragment>
 
-          <div className="mt-6 border-t pt-4">
+          <Fragment>
             <h3 className="text-lg font-semibold text-center">Contact</h3>
-            <div className="flex flex-col items-center mt-2 text-sm">
-              <p>Author: 0xWulf</p>
-              <p>Email: dev@0xwulf.dev</p>
-              <a 
-                href="https://github.com/hexawulf/CodePatchwork" 
+            <div className="flex flex-col items-center gap-1">
+              <span>Author  0xWulf</span>
+              <span>Email  dev@0xwulf.dev</span>
+              <a
+                href="https://github.com/hexawulf/CodePatchwork"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline"
               >
-                GitHub Repository
+                GitHub Repo
               </a>
             </div>
-          </div>
-        </div>
+          </Fragment>
+        </section>
 
         <DialogFooter>
-          <Button 
-            onClick={() => onOpenChange(false)}
-            className="w-full"
-          >
+          <Button onClick={() => onOpenChange(false)} className="w-full">
             Close
           </Button>
         </DialogFooter>
