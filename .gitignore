@@ -68,3 +68,4 @@ firebase-adminsdk.json
 # Drizzle
 .drizzle
 drizzle-studio.db
+codepatchwork-c3d85-firebase-adminsdk-*.json
