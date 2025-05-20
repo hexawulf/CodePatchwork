@@ -2,7 +2,7 @@
 **/temp-firebase-config.ts
 **/temp-firebase-config.js
 **/firebase-config-temp.*
-
+check-env.js
 # Dependencies
 node_modules
 .pnp

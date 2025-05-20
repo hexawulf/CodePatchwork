@@ -46,43 +46,43 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 3. Security headers (CSP + disable COOP/COEP so auth popups work) */
+/* 3. Security headers - Modified to fix Firebase auth                */
 /* ────────────────────────────────────────────────────────────────── */
+// Disable all helmet protections and apply only what we need
 app.use(
-  // completely disable opener/embedder policies so signInWithPopup can close itself
+  // Completely disable COOP and COEP policies for auth popups
   helmet.crossOriginOpenerPolicy({ policy: "unsafe-none" }),
   helmet.crossOriginEmbedderPolicy({ policy: "unsafe-none" }),
-
-  // then apply your existing CSP
+  
+  // Apply minimum security headers to allow Firebase auth
   helmet.contentSecurityPolicy({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: [
-        "'self'",
+        "'self'", 
         "'unsafe-inline'",
-        "https://www.gstatic.com",    // Firebase SDK
-        "https://apis.google.com",    // Google Sign-in
+        "'unsafe-eval'", // Needed for some Firebase operations
+        "https://www.gstatic.com",
+        "https://apis.google.com",
+        "https://*.firebaseio.com",
+        "https://*.firebaseapp.com",
       ],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "https://fonts.googleapis.com",
-      ],
-      fontSrc: [
-        "'self'",
-        "https://fonts.gstatic.com",
-      ],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
       connectSrc: [
         "'self'",
         "https://identitytoolkit.googleapis.com",
         "https://securetoken.googleapis.com",
         "https://www.googleapis.com",
+        "https://*.firebaseio.com",
+        "https://*.firebaseapp.com",
       ],
       frameSrc: [
         "https://accounts.google.com",
         `https://${process.env.VITE_FIREBASE_AUTH_DOMAIN}`,
+        "https://*.firebaseapp.com",
       ],
-      imgSrc: ["'self'", "data:"],
+      imgSrc: ["'self'", "data:", "https://*.googleusercontent.com"],
     },
   })
 );
