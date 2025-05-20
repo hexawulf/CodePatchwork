@@ -1,13 +1,13 @@
+// client/src/App.tsx
+
+import React, { useEffect } from "react";
 import { Switch, Route } from "wouter";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
-import { SnippetProvider } from "@/contexts/SnippetContext";
-import { CollectionProvider } from "@/contexts/CollectionContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { CodeThemeProvider } from "@/contexts/CodeThemeContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { SnippetProvider } from "@/contexts/SnippetContext";
+import { CollectionProvider } from "@/contexts/CollectionContext";
+import { useAuthContext } from "@/contexts/AuthContext";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Snippets from "@/pages/Snippets";
@@ -16,8 +16,7 @@ import CollectionDetail from "@/pages/CollectionDetail";
 import Tags from "@/pages/Tags";
 import Settings from "@/pages/Settings";
 import SharedSnippet from "@/pages/SharedSnippet";
-import { useEffect } from "react";
-import { DebugEnv } from './components/Debug';
+import { DebugEnv } from "./components/Debug";
 
 function Router() {
   return (
@@ -34,40 +33,49 @@ function Router() {
   );
 }
 
-function App() {
-  // Get theme from document.documentElement class list
+export default function App() {
+  const { user, loading, signIn } = useAuthContext();
+
+  // Apply your theme class once on mount
   useEffect(() => {
-    // Check for system preference
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const savedTheme = localStorage.getItem("theme");
-    const isDark = savedTheme === "dark" || (!savedTheme && prefersDark);
-    
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    const saved = localStorage.getItem("theme");
+    const isDark = saved === "dark" || (!saved && prefersDark);
+    document.documentElement.classList.toggle("dark", isDark);
   }, []);
 
+  // 1) Still waiting for Firebase → show spinner or placeholder
+  if (loading) {
+    return <div className="h-screen flex items-center justify-center">Loading…</div>;
+  }
+
+  // 2) Not signed in → show Google button
+  if (!user) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <button
+          onClick={signIn}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Sign in with Google
+        </button>
+      </div>
+    );
+  }
+
+  // 3) Signed in → render the full app
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ThemeProvider>
-          <CodeThemeProvider>
-            <SnippetProvider>
-              <CollectionProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Router />
-                </TooltipProvider>
-              </CollectionProvider>
-            </SnippetProvider>
-          </CodeThemeProvider>
-        </ThemeProvider>
-      </AuthProvider>
-    <DebugEnv />
-  </QueryClientProvider>
+    <ThemeProvider>
+      <CodeThemeProvider>
+        <SnippetProvider>
+          <CollectionProvider>
+            <TooltipProvider>
+              <Router />
+              <DebugEnv />
+            </TooltipProvider>
+          </CollectionProvider>
+        </SnippetProvider>
+      </CodeThemeProvider>
+    </ThemeProvider>
   );
 }
-
-export default App;

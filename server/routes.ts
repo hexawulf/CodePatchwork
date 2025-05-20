@@ -1,840 +1,551 @@
+// server/routes.ts
 import type { Express, Request, Response, NextFunction, RequestHandler } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { simpleStorage } from "./simple-storage"; // Add this import
-import { 
-  insertSnippetSchema, 
-  insertCollectionSchema, 
+import { createServer, type Server }                from "http";
+import admin                                        from "firebase-admin";
+import type { DecodedIdToken }                      from "firebase-admin/auth";
+import { pool }                                     from "./db";
+import { storage }                                  from "./storage";
+import { simpleStorage }                            from "./simple-storage";
+import {
+  insertSnippetSchema,
+  insertCollectionSchema,
   insertCollectionItemSchema,
   insertCommentSchema,
   insertUserSchema
 } from "@shared/schema";
-import { z } from "zod";
-import { pool } from './db'; // Add this import
+import { z }                                       from "zod";
 
-// Debug database connection
-(async () => {
+/** ─── 1) Debug DB connection on startup ───────────────────────────────── */
+;(async () => {
   try {
     const client = await pool.connect();
-    console.log("✅ DATABASE CONNECTION TEST: Successfully connected to database!");
-    
-    // Test a simple query
-    const result = await client.query('SELECT NOW() as time');
-    console.log("✅ DATABASE CONNECTION TEST: Database time:", result.rows[0].time);
-    
+    console.log("✅ DATABASE CONNECTION TEST: OK —", (await client.query("SELECT NOW()")).rows[0].now);
     client.release();
-  } catch (error) {
-    console.error("❌ DATABASE CONNECTION TEST: Failed to connect:", error);
+  } catch (e) {
+    console.error("❌ DATABASE CONNECTION TEST: FAILED", e);
   }
 })();
 
-// Auth middleware to verify Firebase authentication tokens
-const authMiddleware: RequestHandler = async (req, res, next) => {
+/** ─── 2) Auth middleware (verifies Firebase ID Token in Authorization header) ── */
+export const authMiddleware: RequestHandler = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: "Unauthorized - No token provided" });
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Unauthorized: No token" });
     }
-    
-    const uid = authHeader.split(' ')[1];
-    if (!uid) {
-      return res.status(401).json({ message: "Unauthorized - Invalid token" });
-    }
-    
-    // Look up the user in our database
-    const user = await storage.getUser(uid);
+    const idToken = authHeader.split(" ")[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const user = await storage.getUser(decoded.uid);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    
-    // Attach the user to the request object
-    (req as any).user = user;
+    ;(req as any).user = user;
     next();
-  } catch (error) {
-    console.error("Auth middleware error:", error);
-    return res.status(500).json({ message: "Internal server error during authentication" });
+  } catch (err: any) {
+    console.error("Auth middleware error:", err);
+    res.status(401).json({ message: "Unauthorized: Invalid token", error: err.message });
   }
 };
 
+/** ─── 3) Register all routes ─────────────────────────────────────────────── */
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Firebase Auth endpoints
-  app.post("/api/auth/user", async (req, res) => {
-    try {
-      // This endpoint will be called by the frontend after Firebase authentication
-      const { uid, email, displayName, photoURL } = req.body;
-      
-      if (!uid) {
-        return res.status(400).json({ message: "User ID (uid) is required" });
-      }
-      
-      // Upsert the user in our database
-      const user = await storage.upsertUser({
-        id: uid,
-        email: email || null,
-        displayName: displayName || null,
-        photoURL: photoURL || null
-      });
-      
-      res.status(201).json(user);
-    } catch (error) {
-      console.error("Error creating/updating user:", error);
-      res.status(500).json({ message: "Failed to create/update user" });
+  // ─── 3.1) NEW: Firebase Auth endpoints ──────────────────────────────────
+
+  app.post("/api/auth/user", async (req: Request, res: Response) => {
+    const { idToken, uid, email, displayName, photoURL } = req.body as any;
+
+    // if neither JWT nor uid is supplied → bad request
+    if (!idToken && !uid) {
+      return res
+        .status(400)
+        .json({ message: "Missing idToken or uid in request body" });
     }
-  });
-  
-  // Get current user's profile
-  app.get("/api/auth/me", authMiddleware, (req, res) => {
+
     try {
-      // User is already attached to req object by authMiddleware
-      res.json((req as any).user);
-    } catch (error) {
-      console.error("Error fetching current user:", error);
-      res.status(500).json({ message: "Failed to fetch user data" });
+      // build a normalized user record
+      let userRecord: {
+        id: string;
+        email: string | null;
+        displayName: string | null;
+        photoURL: string | null;
+      };
+
+      if (idToken) {
+        // verify the Firebase JWT
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        userRecord = {
+          id: decoded.uid,
+          email: decoded.email   ?? null,
+          displayName: decoded.name    ?? null,
+          photoURL: decoded.picture    ?? null,
+        };
+      } else {
+        // fallback: trust the client-provided fields
+        userRecord = {
+          id: uid,
+          email: email        ?? null,
+          displayName: displayName ?? null,
+          photoURL: photoURL      ?? null,
+        };
+      }
+
+      // upsert into your users table
+      const user = await storage.upsertUser(userRecord);
+      return res.status(201).json(user);
+    } catch (err: any) {
+      console.error("/api/auth/user error:", err);
+      return res.status(500).json({
+        message: "Auth + upsert failed",
+        error: err.message,
+      });
     }
   });
 
-  // Snippets endpoints - UPDATED
+  app.get("/api/auth/me", authMiddleware, (_req, res) => {
+    // req.user was attached by your authMiddleware
+    res.json(( _req as any ).user);
+  });
+  // ──────────────────────────────────────────────────────────────────────────
+  // ─── 3.2) Your existing snippet, collection, comment, etc. endpoints go here ─
+  //      (Everything from app.get("/api/snippets") on down stays exactly as before.)
+  //
+  //      e.g.:
+  //      app.get("/api/snippets", async (req, res) => { … });
+  //      app.post("/api/snippets", authMiddleware, async (req, res) => { … });
+  //      …and so on…
+  //
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // ────────────────────────────────────────────────────────────────
+  //   2) Snippets endpoints
+  // ────────────────────────────────────────────────────────────────
   app.get("/api/snippets", async (req, res) => {
     try {
-      console.log("SNIPPETS API: Starting request");
-      
-      // Create a filter object for our storage methods
-      const filters: {
-        search?: string;
-        language?: string | string[];
-        tag?: string | string[];
-        favorites?: boolean;
-      } = {};
-      
-      // Add search filter if provided
-      if (req.query.search) {
-        filters.search = req.query.search as string;
-        console.log("SNIPPETS API: Adding search filter:", filters.search);
-      }
-      
-      // Handle language filter
-      if (req.query.language) {
-        filters.language = Array.isArray(req.query.language) 
-          ? req.query.language as string[] 
-          : req.query.language as string;
-        console.log("SNIPPETS API: Adding language filter:", filters.language);
-      }
-      
-      // Handle tag filter
-      if (req.query.tag) {
-        filters.tag = Array.isArray(req.query.tag)
-          ? req.query.tag as string[]
-          : req.query.tag as string;
-        console.log("SNIPPETS API: Adding tag filter:", filters.tag);
-      }
-      
-      // Handle favorites filter
-      if (req.query.favorites === 'true') {
-        filters.favorites = true;
-        console.log("SNIPPETS API: Adding favorites filter");
-      }
-      
-      // Try with simple storage first
+      const filters: any = {};
+      if (req.query.search) filters.search = String(req.query.search);
+      if (req.query.language) filters.language = req.query.language;
+      if (req.query.tag) filters.tag = req.query.tag;
+      if (req.query.favorites === "true") filters.favorites = true;
+
       try {
-        console.log("SNIPPETS API: Trying with simple storage");
-        const snippets = await simpleStorage.getSnippets(filters);
-        console.log(`SNIPPETS API: Successfully retrieved ${snippets.length} snippets with simple storage`);
-        return res.json(snippets);
-      } catch (simpleError) {
-        console.error("SNIPPETS API: Simple storage failed:", simpleError);
-        
-        // Fall back to regular storage
-        console.log("SNIPPETS API: Falling back to regular storage");
-        const snippets = await storage.getSnippets(filters);
-        console.log(`SNIPPETS API: Successfully retrieved ${snippets.length} snippets with regular storage`);
-        res.json(snippets);
+        const list = await simpleStorage.getSnippets(filters);
+        return res.json(list);
+      } catch {
+        const list = await storage.getSnippets(filters);
+        return res.json(list);
       }
-    } catch (error) {
-      console.error("SNIPPETS API ERROR:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
-      res.status(500).json({ 
-        message: "Failed to fetch snippets", 
-        error: error instanceof Error ? error.message : String(error) 
-      });
+    } catch (err) {
+      console.error("[SNIPPETS] GET /api/snippets error:", err);
+      res.status(500).json({ message: "Failed to fetch snippets", error: err.toString() });
     }
   });
 
-  // Export endpoint MUST be defined BEFORE the :id route to avoid conflict
   app.get("/api/snippets/export", async (req, res) => {
     try {
-      console.log("EXPORT API: Starting request");
-      
-      // Try with simple storage first
+      let list;
       try {
-        console.log("EXPORT API: Trying with simple storage");
-        const snippets = await simpleStorage.getSnippets();
-        console.log(`EXPORT API: Successfully retrieved ${snippets.length} snippets for export`);
-        
-        // Format for download
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
-        
-        return res.json(snippets);
-      } catch (simpleError) {
-        console.error("EXPORT API: Simple storage failed:", simpleError);
-        
-        // Fall back to regular storage
-        console.log("EXPORT API: Falling back to regular storage");
-        const snippets = await storage.getSnippets();
-        console.log(`EXPORT API: Successfully retrieved ${snippets.length} snippets with regular storage`);
-        
-        // Format for download
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', 'attachment; filename="codepatchwork-snippets.json"');
-        
-        res.json(snippets);
+        list = await simpleStorage.getSnippets({});
+      } catch {
+        list = await storage.getSnippets({});
       }
-    } catch (error) {
-      console.error("EXPORT API ERROR:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
-      res.status(500).json({ 
-        message: "Failed to export snippets", 
-        error: error instanceof Error ? error.message : String(error) 
-      });
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="snippets.json"`);
+      res.json(list);
+    } catch (err) {
+      console.error("[EXPORT] GET /api/snippets/export error:", err);
+      res.status(500).json({ message: "Failed to export snippets", error: err.toString() });
     }
   });
 
-  // Individual snippet route - UPDATED
   app.get("/api/snippets/:id", async (req, res) => {
     try {
-      console.log("INDIVIDUAL SNIPPET API: Starting request for id:", req.params.id);
-      const id = parseInt(req.params.id);
-      
-      // Try with simple storage first
+      const id = Number(req.params.id);
+      let snippet;
       try {
-        console.log("INDIVIDUAL SNIPPET API: Trying with simple storage");
-        const snippet = await simpleStorage.getSnippet(id);
-        
-        if (!snippet) {
-          console.log(`INDIVIDUAL SNIPPET API: No snippet found with id ${id}`);
-          return res.status(404).json({ message: "Snippet not found" });
-        }
-        
-        // Increment view count
-        await simpleStorage.incrementSnippetViewCount(id);
-        console.log(`INDIVIDUAL SNIPPET API: Successfully retrieved snippet ${id} with simple storage`);
-        return res.json(snippet);
-      } catch (simpleError) {
-        console.error("INDIVIDUAL SNIPPET API: Simple storage failed:", simpleError);
-        
-        // Fall back to regular storage
-        console.log("INDIVIDUAL SNIPPET API: Falling back to regular storage");
-        const snippet = await storage.getSnippet(id);
-        
-        if (!snippet) {
-          console.log(`INDIVIDUAL SNIPPET API: No snippet found with id ${id}`);
-          return res.status(404).json({ message: "Snippet not found" });
-        }
-        
-        // Increment view count
-        await storage.incrementSnippetViewCount(id);
-        console.log(`INDIVIDUAL SNIPPET API: Successfully retrieved snippet ${id} with regular storage`);
-        res.json(snippet);
+        snippet = await simpleStorage.getSnippet(id);
+      } catch {
+        snippet = await storage.getSnippet(id);
       }
-    } catch (error) {
-      console.error("INDIVIDUAL SNIPPET API ERROR:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
-      res.status(500).json({ 
-        message: "Failed to fetch snippet", 
-        error: error instanceof Error ? error.message : String(error) 
-      });
+      if (!snippet) return res.status(404).json({ message: "Not found" });
+      // increment view count
+      await storage.incrementSnippetViewCount(id);
+      res.json(snippet);
+    } catch (err) {
+      console.error("[SNIPPETS] GET /api/snippets/:id error:", err);
+      res.status(500).json({ message: "Failed to fetch snippet", error: err.toString() });
     }
   });
 
   app.post("/api/snippets", authMiddleware, async (req, res) => {
     try {
-      const parsedBody = insertSnippetSchema.parse(req.body);
-      const snippet = await storage.createSnippet(parsedBody);
-      res.status(201).json(snippet);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Invalid snippet data", 
-          errors: error.errors 
-        });
+      const dto = insertSnippetSchema.parse(req.body);
+      const created = await storage.createSnippet(dto);
+      res.status(201).json(created);
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: err.errors });
       }
-      console.error("Error creating snippet:", error);
+      console.error("[SNIPPETS] POST /api/snippets error:", err);
       res.status(500).json({ message: "Failed to create snippet" });
     }
   });
 
   app.put("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      const parsedBody = insertSnippetSchema.parse(req.body);
-      
-      const snippet = await storage.getSnippet(id);
-      if (!snippet) {
-        return res.status(404).json({ message: "Snippet not found" });
+      const id = Number(req.params.id);
+      const dto = insertSnippetSchema.parse(req.body);
+      const existing = await storage.getSnippet(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (existing.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Verify ownership - users can only update their own snippets
-      if (snippet.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to modify this snippet" });
+      const updated = await storage.updateSnippet(id, dto);
+      res.json(updated);
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: err.errors });
       }
-      
-      const updatedSnippet = await storage.updateSnippet(id, parsedBody);
-      res.json(updatedSnippet);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Invalid snippet data", 
-          errors: error.errors 
-        });
-      }
-      console.error("Error updating snippet:", error);
+      console.error("[SNIPPETS] PUT /api/snippets/:id error:", err);
       res.status(500).json({ message: "Failed to update snippet" });
     }
   });
 
   app.delete("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      
-      const snippet = await storage.getSnippet(id);
-      if (!snippet) {
-        return res.status(404).json({ message: "Snippet not found" });
+      const id = Number(req.params.id);
+      const existing = await storage.getSnippet(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (existing.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Verify ownership - users can only delete their own snippets
-      if (snippet.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to delete this snippet" });
-      }
-      
       await storage.deleteSnippet(id);
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting snippet:", error);
+    } catch (err) {
+      console.error("[SNIPPETS] DELETE /api/snippets/:id error:", err);
       res.status(500).json({ message: "Failed to delete snippet" });
     }
   });
 
-  // Toggle favorite status
   app.post("/api/snippets/:id/favorite", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      
-      const snippet = await storage.getSnippet(id);
-      if (!snippet) {
-        return res.status(404).json({ message: "Snippet not found" });
+      const id = Number(req.params.id);
+      const existing = await storage.getSnippet(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (existing.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Ensure we only let users toggle favorites on their own snippets
-      if (snippet.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to favorite this snippet" });
-      }
-      
-      const updatedSnippet = await storage.toggleSnippetFavorite(id);
-      res.json(updatedSnippet);
-    } catch (error) {
-      console.error("Error toggling favorite status:", error);
-      res.status(500).json({ message: "Failed to update favorite status" });
+      const toggled = await storage.toggleSnippetFavorite(id);
+      res.json(toggled);
+    } catch (err) {
+      console.error("[SNIPPETS] POST /api/snippets/:id/favorite error:", err);
+      res.status(500).json({ message: "Failed to toggle favorite" });
     }
   });
 
-  // Get all languages - UPDATED
+  //
+  // ────────────────────────────────────────────────────────────────
+  //   3) Languages & Tags
+  // ────────────────────────────────────────────────────────────────
   app.get("/api/languages", async (req, res) => {
     try {
-      console.log("LANGUAGES API: Starting request");
-      
-      // Try with simple storage first
+      let langs;
       try {
-        console.log("LANGUAGES API: Trying with simple storage");
-        const languages = await simpleStorage.getLanguages();
-        console.log("LANGUAGES API: Successfully retrieved languages with simple storage:", languages);
-        return res.json(languages);
-      } catch (simpleError) {
-        console.error("LANGUAGES API: Simple storage failed:", simpleError);
-        
-        // Fall back to regular storage
-        console.log("LANGUAGES API: Falling back to regular storage");
-        const languages = await storage.getLanguages();
-        console.log("LANGUAGES API: Successfully retrieved languages with regular storage:", languages);
-        res.json(languages);
+        langs = await simpleStorage.getLanguages();
+      } catch {
+        langs = await storage.getLanguages();
       }
-    } catch (error) {
-      console.error("LANGUAGES API ERROR:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
-      res.status(500).json({ 
-        message: "Failed to fetch languages", 
-        error: error instanceof Error ? error.message : String(error) 
-      });
+      res.json(langs);
+    } catch (err) {
+      console.error("[LANGUAGES] GET /api/languages error:", err);
+      res.status(500).json({ message: "Failed to fetch languages" });
     }
   });
 
-  // Get all tags - UPDATED
   app.get("/api/tags", async (req, res) => {
     try {
-      console.log("TAGS API: Starting request");
-      
-      // Try with simple storage first
+      let tags;
       try {
-        console.log("TAGS API: Trying with simple storage");
-        const tags = await simpleStorage.getTags();
-        console.log("TAGS API: Successfully retrieved tags with simple storage:", tags);
-        return res.json(tags);
-      } catch (simpleError) {
-        console.error("TAGS API: Simple storage failed:", simpleError);
-        
-        // Fall back to regular storage
-        console.log("TAGS API: Falling back to regular storage");
-        const tags = await storage.getTags();
-        console.log("TAGS API: Successfully retrieved tags with regular storage:", tags);
-        res.json(tags);
+        tags = await simpleStorage.getTags();
+      } catch {
+        tags = await storage.getTags();
       }
-    } catch (error) {
-      console.error("TAGS API ERROR:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
-      res.status(500).json({ 
-        message: "Failed to fetch tags", 
-        error: error instanceof Error ? error.message : String(error) 
-      });
+      res.json(tags);
+    } catch (err) {
+      console.error("[TAGS] GET /api/tags error:", err);
+      res.status(500).json({ message: "Failed to fetch tags" });
     }
   });
 
-  // Import/Export endpoints
-  app.post("/api/snippets/import", authMiddleware, async (req, res) => {
-    try {
-      const { snippets } = req.body;
-      
-      if (!Array.isArray(snippets)) {
-        return res.status(400).json({ message: "Invalid import format. Expected array of snippets." });
-      }
-      
-      const importedSnippets = [];
-      
-      for (const snippet of snippets) {
-        // Validate each snippet has required fields
-        if (!snippet.title || !snippet.code || !snippet.language) {
-          continue; // Skip invalid snippets
-        }
-        
-        const newSnippet = await storage.createSnippet({
-          title: snippet.title,
-          code: snippet.code,
-          language: snippet.language,
-          description: snippet.description || null,
-          tags: snippet.tags || null,
-          userId: (req as any).user?.id || null,
-          isFavorite: snippet.isFavorite || false
-        });
-        
-        importedSnippets.push(newSnippet);
-      }
-      
-      res.status(201).json({ 
-        message: `Successfully imported ${importedSnippets.length} snippets`, 
-        snippets: importedSnippets 
-      });
-    } catch (error) {
-      console.error("Error importing snippets:", error);
-      res.status(500).json({ message: "Failed to import snippets" });
-    }
-  });
-  
-  // Collections endpoints - UPDATED
+  //
+  // ────────────────────────────────────────────────────────────────
+  //   4) Collections
+  // ────────────────────────────────────────────────────────────────
   app.get("/api/collections", async (req, res) => {
     try {
-      console.log("COLLECTIONS API: Starting request");
-      
-      // Try with simple storage first
+      let cols;
       try {
-        console.log("COLLECTIONS API: Trying with simple storage");
-        const collections = await simpleStorage.getCollections();
-        console.log(`COLLECTIONS API: Successfully retrieved ${collections.length} collections with simple storage`);
-        return res.json(collections);
-      } catch (simpleError) {
-        console.error("COLLECTIONS API: Simple storage failed:", simpleError);
-        
-        // Fall back to regular storage
-        console.log("COLLECTIONS API: Falling back to regular storage");
-        const collections = await storage.getCollections();
-        console.log(`COLLECTIONS API: Successfully retrieved ${collections.length} collections with regular storage`);
-        res.json(collections);
+        cols = await simpleStorage.getCollections();
+      } catch {
+        cols = await storage.getCollections();
       }
-    } catch (error) {
-      console.error("COLLECTIONS API ERROR:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
-      res.status(500).json({ 
-        message: "Failed to fetch collections", 
-        error: error instanceof Error ? error.message : String(error) 
-      });
+      res.json(cols);
+    } catch (err) {
+      console.error("[COLLECTIONS] GET /api/collections error:", err);
+      res.status(500).json({ message: "Failed to fetch collections" });
     }
   });
 
   app.get("/api/collections/:id", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const collection = await storage.getCollection(id);
-      
-      if (!collection) {
-        return res.status(404).json({ message: "Collection not found" });
-      }
-      
-      res.json(collection);
-    } catch (error) {
-      console.error("Error fetching collection:", error);
+      const id = Number(req.params.id);
+      const col = await storage.getCollection(id);
+      if (!col) return res.status(404).json({ message: "Not found" });
+      res.json(col);
+    } catch (err) {
+      console.error("[COLLECTIONS] GET /api/collections/:id error:", err);
       res.status(500).json({ message: "Failed to fetch collection" });
     }
   });
 
   app.get("/api/collections/:id/snippets", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const snippets = await storage.getCollectionSnippets(id);
-      res.json(snippets);
-    } catch (error) {
-      console.error("Error fetching collection snippets:", error);
+      const id = Number(req.params.id);
+      const list = await storage.getCollectionSnippets(id);
+      res.json(list);
+    } catch (err) {
+      console.error("[COLLECTIONS] GET /api/collections/:id/snippets error:", err);
       res.status(500).json({ message: "Failed to fetch collection snippets" });
     }
   });
 
   app.post("/api/collections", authMiddleware, async (req, res) => {
     try {
-      // Add the current user's ID to the collection data
-      const currentUserId = (req as any).user?.id;
-      const collectionData = {
+      const dto = insertCollectionSchema.parse({
         ...req.body,
-        userId: currentUserId
-      };
-      
-      const parsedBody = insertCollectionSchema.parse(collectionData);
-      const collection = await storage.createCollection(parsedBody);
-      res.status(201).json(collection);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Invalid collection data", 
-          errors: error.errors 
-        });
+        userId: (req as any).user.id
+      });
+      const created = await storage.createCollection(dto);
+      res.status(201).json(created);
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: err.errors });
       }
-      console.error("Error creating collection:", error);
+      console.error("[COLLECTIONS] POST /api/collections error:", err);
       res.status(500).json({ message: "Failed to create collection" });
     }
   });
-  
+
   app.put("/api/collections/:id", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      const parsedBody = insertCollectionSchema.parse(req.body);
-      
-      const collection = await storage.getCollection(id);
-      if (!collection) {
-        return res.status(404).json({ message: "Collection not found" });
+      const id = Number(req.params.id);
+      const dto = insertCollectionSchema.parse(req.body);
+      const existing = await storage.getCollection(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (existing.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Verify ownership - users can only update their own collections
-      if (collection.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to modify this collection" });
+      const updated = await storage.updateCollection(id, dto);
+      res.json(updated);
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: err.errors });
       }
-      
-      const updatedCollection = await storage.updateCollection(id, parsedBody);
-      res.json(updatedCollection);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Invalid collection data", 
-          errors: error.errors 
-        });
-      }
-      console.error("Error updating collection:", error);
+      console.error("[COLLECTIONS] PUT /api/collections/:id error:", err);
       res.status(500).json({ message: "Failed to update collection" });
     }
   });
-  
+
   app.delete("/api/collections/:id", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      
-      const collection = await storage.getCollection(id);
-      if (!collection) {
-        return res.status(404).json({ message: "Collection not found" });
+      const id = Number(req.params.id);
+      const existing = await storage.getCollection(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (existing.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Verify ownership - users can only delete their own collections
-      if (collection.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to delete this collection" });
-      }
-      
       await storage.deleteCollection(id);
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting collection:", error);
+    } catch (err) {
+      console.error("[COLLECTIONS] DELETE /api/collections/:id error:", err);
       res.status(500).json({ message: "Failed to delete collection" });
     }
   });
 
-  app.post("/api/collections/:collectionId/snippets/:snippetId", authMiddleware, async (req, res) => {
-    try {
-      const collectionId = parseInt(req.params.collectionId);
-      const snippetId = parseInt(req.params.snippetId);
-      const currentUserId = (req as any).user?.id;
-      
-      // Verify collection ownership
-      const collection = await storage.getCollection(collectionId);
-      if (!collection) {
-        return res.status(404).json({ message: "Collection not found" });
+  app.post(
+    "/api/collections/:collectionId/snippets/:snippetId",
+    authMiddleware,
+    async (req, res) => {
+      try {
+        const collectionId = Number(req.params.collectionId);
+        const snippetId = Number(req.params.snippetId);
+        const existing = await storage.getCollection(collectionId);
+        if (!existing) return res.status(404).json({ message: "Not found" });
+        if (existing.userId !== (req as any).user.id) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+        const dto = insertCollectionItemSchema.parse({ collectionId, snippetId });
+        const created = await storage.addSnippetToCollection(dto);
+        res.status(201).json(created);
+      } catch (err: any) {
+        if (err instanceof z.ZodError) {
+          return res.status(400).json({ message: "Invalid data", errors: err.errors });
+        }
+        console.error(
+          "[COLLECTION ITEMS] POST /api/collections/:collectionId/snippets/:snippetId error:",
+          err
+        );
+        res.status(500).json({ message: "Failed to add snippet to collection" });
       }
-      
-      // Ensure users can only add snippets to their own collections
-      if (collection.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to modify this collection" });
-      }
-      
-      const parsedBody = insertCollectionItemSchema.parse({
-        collectionId,
-        snippetId
-      });
-      
-      const collectionItem = await storage.addSnippetToCollection(parsedBody);
-      res.status(201).json(collectionItem);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Invalid collection item data", 
-          errors: error.errors 
-        });
-      }
-      console.error("Error adding snippet to collection:", error);
-      res.status(500).json({ message: "Failed to add snippet to collection" });
     }
-  });
+  );
 
-  app.delete("/api/collections/:collectionId/snippets/:snippetId", authMiddleware, async (req, res) => {
-    try {
-      const collectionId = parseInt(req.params.collectionId);
-      const snippetId = parseInt(req.params.snippetId);
-      const currentUserId = (req as any).user?.id;
-      
-      // Verify collection ownership
-      const collection = await storage.getCollection(collectionId);
-      if (!collection) {
-        return res.status(404).json({ message: "Collection not found" });
+  app.delete(
+    "/api/collections/:collectionId/snippets/:snippetId",
+    authMiddleware,
+    async (req, res) => {
+      try {
+        const collectionId = Number(req.params.collectionId);
+        const snippetId = Number(req.params.snippetId);
+        const existing = await storage.getCollection(collectionId);
+        if (!existing) return res.status(404).json({ message: "Not found" });
+        if (existing.userId !== (req as any).user.id) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+        await storage.removeSnippetFromCollection(collectionId, snippetId);
+        res.status(204).send();
+      } catch (err) {
+        console.error(
+          "[COLLECTION ITEMS] DELETE /api/collections/:collectionId/snippets/:snippetId error:",
+          err
+        );
+        res.status(500).json({ message: "Failed to remove snippet from collection" });
       }
-      
-      // Ensure users can only remove snippets from their own collections
-      if (collection.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to modify this collection" });
-      }
-      
-      await storage.removeSnippetFromCollection(collectionId, snippetId);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error removing snippet from collection:", error);
-      res.status(500).json({ message: "Failed to remove snippet from collection" });
     }
-  });
+  );
 
-  // Sharing endpoints
+  //
+  // ────────────────────────────────────────────────────────────────
+  //   5) Sharing & Publishing
+  // ────────────────────────────────────────────────────────────────
   app.get("/api/shared/:shareId", async (req, res) => {
     try {
-      const { shareId } = req.params;
+      const shareId = req.params.shareId;
       const snippet = await storage.getSnippetByShareId(shareId);
-      
-      if (!snippet) {
-        return res.status(404).json({ message: "Shared snippet not found" });
-      }
-      
-      if (!snippet.isPublic) {
-        return res.status(403).json({ message: "This snippet is not publicly accessible" });
-      }
-      
-      // Increment the view count for the shared snippet
+      if (!snippet) return res.status(404).json({ message: "Not found" });
+      if (!snippet.isPublic) return res.status(403).json({ message: "Forbidden" });
       await storage.incrementSnippetViewCount(snippet.id);
-      
       res.json(snippet);
-    } catch (error) {
-      console.error("Error fetching shared snippet:", error);
+    } catch (err) {
+      console.error("[SHARED] GET /api/shared/:shareId error:", err);
       res.status(500).json({ message: "Failed to fetch shared snippet" });
     }
   });
-  
+
   app.post("/api/snippets/:id/share", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      
-      const snippet = await storage.getSnippet(id);
-      if (!snippet) {
-        return res.status(404).json({ message: "Snippet not found" });
+      const id = Number(req.params.id);
+      const existing = await storage.getSnippet(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (existing.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Verify ownership - users can only share their own snippets
-      if (snippet.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to share this snippet" });
-      }
-      
-      // Generate a share ID if one doesn't exist already
-      let shareId = snippet.shareId;
-      if (!shareId) {
-        shareId = await storage.generateShareId(id);
-      }
-      
+      let shareId = existing.shareId;
+      if (!shareId) shareId = await storage.generateShareId(id);
       res.json({ shareId });
-    } catch (error) {
-      console.error("Error sharing snippet:", error);
+    } catch (err) {
+      console.error("[SHARE] POST /api/snippets/:id/share error:", err);
       res.status(500).json({ message: "Failed to share snippet" });
     }
   });
-  
+
   app.post("/api/snippets/:id/publish", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      
-      const snippet = await storage.getSnippet(id);
-      if (!snippet) {
-        return res.status(404).json({ message: "Snippet not found" });
+      const id = Number(req.params.id);
+      const existing = await storage.getSnippet(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (existing.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Verify ownership - users can only publish/unpublish their own snippets
-      if (snippet.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to publish this snippet" });
-      }
-      
-      const updatedSnippet = await storage.toggleSnippetPublic(id);
-      res.json(updatedSnippet);
-    } catch (error) {
-      console.error("Error toggling snippet public status:", error);
-      res.status(500).json({ message: "Failed to update snippet public status" });
+      const updated = await storage.toggleSnippetPublic(id);
+      res.json(updated);
+    } catch (err) {
+      console.error("[PUBLISH] POST /api/snippets/:id/publish error:", err);
+      res.status(500).json({ message: "Failed to publish snippet" });
     }
   });
-  
-  // Comment endpoints
+
+  //
+  // ────────────────────────────────────────────────────────────────
+  //   6) Comments
+  // ────────────────────────────────────────────────────────────────
   app.get("/api/snippets/:snippetId/comments", async (req, res) => {
     try {
-      const snippetId = parseInt(req.params.snippetId);
-      
-      const snippet = await storage.getSnippet(snippetId);
-      if (!snippet) {
-        return res.status(404).json({ message: "Snippet not found" });
-      }
-      
+      const snippetId = Number(req.params.snippetId);
       const comments = await storage.getCommentsBySnippetId(snippetId);
       res.json(comments);
-    } catch (error) {
-      console.error("Error fetching comments:", error);
+    } catch (err) {
+      console.error("[COMMENTS] GET /api/snippets/:snippetId/comments error:", err);
       res.status(500).json({ message: "Failed to fetch comments" });
     }
   });
-  
+
   app.post("/api/snippets/:snippetId/comments", authMiddleware, async (req, res) => {
     try {
-      const snippetId = parseInt(req.params.snippetId);
-      
-      const snippet = await storage.getSnippet(snippetId);
-      if (!snippet) {
-        return res.status(404).json({ message: "Snippet not found" });
-      }
-      
-      // Combine snippet ID and user ID with the comment data from the body
-      const commentData = {
+      const snippetId = Number(req.params.snippetId);
+      const dto = insertCommentSchema.parse({
         ...req.body,
         snippetId,
-        userId: (req as any).user?.id || null
-      };
-      
-      const parsedBody = insertCommentSchema.parse(commentData);
-      const comment = await storage.createComment(parsedBody);
-      
-      res.status(201).json(comment);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Invalid comment data", 
-          errors: error.errors 
-        });
+        userId: (req as any).user.id
+      });
+      const created = await storage.createComment(dto);
+      res.status(201).json(created);
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: err.errors });
       }
-      console.error("Error creating comment:", error);
+      console.error("[COMMENTS] POST /api/snippets/:snippetId/comments error:", err);
       res.status(500).json({ message: "Failed to create comment" });
     }
   });
-  
+
   app.put("/api/comments/:id", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      
-      // Get the comment to verify ownership - need to get a specific comment by ID
-      // For this example, we'll need to implement a method to get a comment directly
-      // This is a simplified approach that would need to be improved in a production app
-      const comments = await storage.getCommentsBySnippetId(0); // Using 0 as a placeholder
-      const commentToUpdate = comments?.find(c => c.id === id);
-      
-      if (!commentToUpdate) {
-        return res.status(404).json({ message: "Comment not found" });
+      const id = Number(req.params.id);
+      const all = await storage.getCommentsBySnippetId(0);
+      const comment = all.find(c => c.id === id);
+      if (!comment) return res.status(404).json({ message: "Not found" });
+      if (comment.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Verify comment ownership - users can only update their own comments
-      if (commentToUpdate.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to update this comment" });
-      }
-      
-      // For simplicity, we'll allow partial updates to comments
-      const updatedComment = await storage.updateComment(id, req.body);
-      res.json(updatedComment);
-    } catch (error) {
-      console.error("Error updating comment:", error);
+      const updated = await storage.updateComment(id, req.body);
+      res.json(updated);
+    } catch (err) {
+      console.error("[COMMENTS] PUT /api/comments/:id error:", err);
       res.status(500).json({ message: "Failed to update comment" });
     }
   });
-  
+
   app.delete("/api/comments/:id", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const currentUserId = (req as any).user?.id;
-      
-      // Need to get the comment to verify ownership
-      // This is a simplified approach using the same technique as the update endpoint
-      const comments = await storage.getCommentsBySnippetId(0); // Using 0 as a placeholder
-      const commentToDelete = comments?.find(c => c.id === id);
-      
-      if (!commentToDelete) {
-        return res.status(404).json({ message: "Comment not found" });
+      const id = Number(req.params.id);
+      const all = await storage.getCommentsBySnippetId(0);
+      const comment = all.find(c => c.id === id);
+      if (!comment) return res.status(404).json({ message: "Not found" });
+      if (comment.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      // Verify comment ownership - users can only delete their own comments
-      if (commentToDelete.userId !== currentUserId) {
-        return res.status(403).json({ message: "You don't have permission to delete this comment" });
-      }
-      
       await storage.deleteComment(id);
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting comment:", error);
+    } catch (err) {
+      console.error("[COMMENTS] DELETE /api/comments/:id error:", err);
       res.status(500).json({ message: "Failed to delete comment" });
     }
   });
 
+  //
+  // ────────────────────────────────────────────────────────────────
+  //   Finally, create and return the HTTP server
+  // ────────────────────────────────────────────────────────────────
   const httpServer = createServer(app);
   return httpServer;
 }

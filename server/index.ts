@@ -1,6 +1,5 @@
-/* ------------------------------------------------------------------
- * server/index.ts  –  Express bootstrap for CodePatchwork
- * ------------------------------------------------------------------ */
+// server/index.ts  –  Express bootstrap for CodePatchwork
+/* ------------------------------------------------------------------ */
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -14,12 +13,15 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
-////////////////////////////////////////////////////////////////////////////////
-// 0. Verify & load your service-account JSON
-////////////////////////////////////////////////////////////////////////////////
-const svcPath = process.env.GOOGLE_APPLICATION_CREDENTIALS!;
+/* ────────────────────────────────────────────────────────────────── */
+/* 0. Verify & load your service-account JSON                        */
+/* ────────────────────────────────────────────────────────────────── */
+const svcPath = path.resolve(
+  process.cwd(),
+  process.env.GOOGLE_APPLICATION_CREDENTIALS!
+);
 console.log("→ SERVICE ACCOUNT path:", svcPath);
-console.log("→ Exists on disk?       ", fs.existsSync(svcPath));
+console.log("→ Exists on disk?      ", fs.existsSync(svcPath));
 if (!fs.existsSync(svcPath)) {
   console.error("❌ service account JSON not found. Aborting.");
   process.exit(1);
@@ -29,39 +31,47 @@ const serviceAccount = JSON.parse(
   fs.readFileSync(svcPath, { encoding: "utf-8" })
 );
 
-////////////////////////////////////////////////////////////////////////////////
-// 1. Initialize Firebase Admin with explicit cert
-////////////////////////////////////////////////////////////////////////////////
+/* ────────────────────────────────────────────────────────────────── */
+/* 1. Initialize Firebase Admin with explicit cert                   */
+/* ────────────────────────────────────────────────────────────────── */
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-////////////////////////////////////////////////////////////////////////////////
-// 2. Express + Body parsers
-////////////////////////////////////////////////////////////////////////////////
+/* ────────────────────────────────────────────────────────────────── */
+/* 2. Express + Body parsers                                         */
+/* ────────────────────────────────────────────────────────────────── */
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-////////////////////////////////////////////////////////////////////////////////
-// 3. Security headers (CSP loosened + COOP/COEP off)
-////////////////////////////////////////////////////////////////////////////////
+/* ────────────────────────────────────────────────────────────────── */
+/* 3. Security headers (CSP + disable COOP/COEP so auth popups work) */
+/* ────────────────────────────────────────────────────────────────── */
 app.use(
+  // completely disable opener/embedder policies so signInWithPopup can close itself
+  helmet.crossOriginOpenerPolicy({ policy: "unsafe-none" }),
+  helmet.crossOriginEmbedderPolicy({ policy: "unsafe-none" }),
+
+  // then apply your existing CSP
   helmet.contentSecurityPolicy({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: [
         "'self'",
         "'unsafe-inline'",
-        "https://www.gstatic.com",
-        "https://apis.google.com",
+        "https://www.gstatic.com",    // Firebase SDK
+        "https://apis.google.com",    // Google Sign-in
       ],
       styleSrc: [
         "'self'",
         "'unsafe-inline'",
         "https://fonts.googleapis.com",
       ],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      fontSrc: [
+        "'self'",
+        "https://fonts.gstatic.com",
+      ],
       connectSrc: [
         "'self'",
         "https://identitytoolkit.googleapis.com",
@@ -74,14 +84,12 @@ app.use(
       ],
       imgSrc: ["'self'", "data:"],
     },
-  }),
-  helmet.crossOriginOpenerPolicy({ policy: "unsafe-none" }),
-  helmet.crossOriginEmbedderPolicy({ policy: "unsafe-none" })
+  })
 );
 
-////////////////////////////////////////////////////////////////////////////////
-// 4. Normalize /api/snippets payload
-////////////////////////////////////////////////////////////////////////////////
+/* ────────────────────────────────────────────────────────────────── */
+/* 4. Normalize /api/snippets payload (snake → camel, ISO dates)     */
+/* ────────────────────────────────────────────────────────────────── */
 app.use("/api/snippets", (_req, res, next) => {
   type Row = Record<string, unknown>;
   const rename = { createdat: "createdAt", updatedat: "updatedAt" } as const;
@@ -92,8 +100,7 @@ app.use("/api/snippets", (_req, res, next) => {
       const fixed = body.map((row: Row) => {
         const out: Row = {};
         for (const [k, v] of Object.entries(row)) {
-          const key =
-            rename[k as keyof typeof rename] ?? camelCase(k);
+          const key = rename[k as keyof typeof rename] ?? camelCase(k);
           out[key] =
             (key === "createdAt" || key === "updatedAt") && v != null
               ? new Date(v as string).toISOString()
@@ -105,12 +112,13 @@ app.use("/api/snippets", (_req, res, next) => {
     }
     return origJson(body as any);
   };
+
   next();
 });
 
-////////////////////////////////////////////////////////////////////////////////
-// 5. Simple API logger
-////////////////////////////////////////////////////////////////////////////////
+/* ────────────────────────────────────────────────────────────────── */
+/* 5. Simple API request logger                                      */
+/* ────────────────────────────────────────────────────────────────── */
 app.use((req, res, next) => {
   const t0 = Date.now();
   let payload: any;
@@ -134,27 +142,32 @@ app.use((req, res, next) => {
   next();
 });
 
-////////////////////////////////////////////////////////////////////////////////
-// 6. Routes & error handler
-////////////////////////////////////////////////////////////////////////////////
+/* ────────────────────────────────────────────────────────────────── */
+/* 6. Route registration & global error handler                      */
+/* ────────────────────────────────────────────────────────────────── */
 (async () => {
   const server = await registerRoutes(app);
 
+  // global error handler
   app.use(
     (err: any, _req: Request, res: Response, _next: NextFunction) => {
       console.error("[💥 ERROR]", err.stack || err);
-      res
-        .status(err.status || 500)
-        .json({ message: err.message || "Error" });
+      res.status(err.status || 500).json({ message: err.message || "Error" });
     }
   );
 
+  /* ──────────────────────────────────────────────────────────────── */
+  /* 7. Vite in dev or static in prod                                */
+  /* ──────────────────────────────────────────────────────────────── */
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
+  /* ──────────────────────────────────────────────────────────────── */
+  /* 8. Start HTTP server                                            */
+  /* ──────────────────────────────────────────────────────────────── */
   const port = Number(process.env.PORT) || 3001;
   server.listen(
     { host: "0.0.0.0", port, reusePort: true },

@@ -1,60 +1,47 @@
-/* ------------------------------------------------------------------
- * Firebase bootstrap for CodePatchwork
- * ------------------------------------------------------------------ */
-
+// client/src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { tempFirebaseConfig } from "../temp-firebase-config";
 
-/* ------------------------------------------------------------------
- * 1. Build the Firebase config
- *    – Prefer VITE_* env vars injected by Vite
- *    – Fall back to tempFirebaseConfig when they’re missing (local dev)
- * ------------------------------------------------------------------ */
-const envConfigOK =
-  import.meta.env.VITE_FIREBASE_API_KEY &&
-  import.meta.env.VITE_FIREBASE_AUTH_DOMAIN &&
-  import.meta.env.VITE_FIREBASE_PROJECT_ID;
+// 1️⃣ Pull the seven required VITE_ env-vars out of import.meta.env
+const {
+  VITE_FIREBASE_API_KEY,
+  VITE_FIREBASE_AUTH_DOMAIN,
+  VITE_FIREBASE_PROJECT_ID,
+  VITE_FIREBASE_STORAGE_BUCKET,
+  VITE_FIREBASE_MESSAGING_SENDER_ID,
+  VITE_FIREBASE_APP_ID,
+  VITE_FIREBASE_MEASUREMENT_ID,
+} = import.meta.env;
 
-const firebaseConfig = envConfigOK
-  ? {
-      apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
-      authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId:             import.meta.env.VITE_FIREBASE_APP_ID,
-      measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
-    }
-  : tempFirebaseConfig;
-
-//  🔍  Runtime probe — prints the actual config that ships in the bundle
-console.log("%c[Firebase cfg]", "color:#4ade80;", firebaseConfig);
-
-/* ------------------------------------------------------------------
- * 2. Initialise (avoid duplicates in hot-reload)
- * ------------------------------------------------------------------ */
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-
-/* ------------------------------------------------------------------
- * 3. Auth + Google provider
- * ------------------------------------------------------------------ */
-const auth           = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
-
-/* ------------------------------------------------------------------
- * 4. OPTIONAL: expose handles for DevTools inspection (dev builds only)
- * ------------------------------------------------------------------ */
-if (import.meta.env.MODE !== "production" && typeof window !== "undefined") {
-  // @ts-ignore  intentional debug attachment
-  window.__app  = app;
-  // @ts-ignore
-  window.__auth = auth;
-  // @ts-ignore
-  window.__prov = googleProvider;
+// 2️⃣ Sanity-check: error if any of the “must have” values is missing
+if (
+  !VITE_FIREBASE_API_KEY ||
+  !VITE_FIREBASE_AUTH_DOMAIN ||
+  !VITE_FIREBASE_PROJECT_ID
+) {
+  throw new Error(
+    "[Firebase] Missing required VITE_FIREBASE_* env vars. " +
+      "Make sure your .env is loading them."
+  );
 }
 
-/* ------------------------------------------------------------------
- * 5. Exports
- * ------------------------------------------------------------------ */
-export { app, auth, googleProvider };
+// 3️⃣ Build your config object
+const firebaseConfig = {
+  apiKey: VITE_FIREBASE_API_KEY,
+  authDomain: VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: VITE_FIREBASE_PROJECT_ID,
+  storageBucket: VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: VITE_FIREBASE_APP_ID,
+  measurementId: VITE_FIREBASE_MEASUREMENT_ID,
+};
+
+// 4️⃣ Debug log so you can see exactly what shipped in your bundle
+console.log("%c[Firebase cfg]", "color:#4ade80;", firebaseConfig);
+
+// 5️⃣ Initialise the app (avoiding duplicates on hot-reload)
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+// 6️⃣ Set up Auth + Google provider
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
