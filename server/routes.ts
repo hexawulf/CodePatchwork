@@ -757,35 +757,152 @@ app.post("/api/snippets", async (req, res) => {
     }
   });
 
+  // REPLACEMENT: Delete endpoint with direct database access
   app.delete("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      const existing = await storage.getSnippet(id);
-      if (!existing) return res.status(404).json({ message: "Not found" });
-      if (existing.userId !== (req as any).user.id) {
-        return res.status(403).json({ message: "Forbidden" });
+      console.log(`[DELETE] Delete snippet request received for ID: ${req.params.id}`);
+      
+      // Check authentication
+      const userId = (req as any).user?.id;
+      console.log("[DELETE] Auth user ID:", userId);
+      
+      if (!userId) {
+        console.error("[DELETE] No user ID found in request");
+        return res.status(401).json({ message: "Authentication required" });
       }
-      await storage.deleteSnippet(id);
-      res.status(204).send();
+      
+      const id = Number(req.params.id);
+      
+      // Connect to the database directly
+      const client = await pool.connect();
+      
+      try {
+        // First check if the snippet exists and belongs to the user
+        const checkResult = await client.query(
+          `SELECT id, userid FROM snippets WHERE id = $1`,
+          [id]
+        );
+        
+        if (checkResult.rows.length === 0) {
+          console.log(`[DELETE] Snippet not found with ID: ${id}`);
+          return res.status(404).json({ message: "Snippet not found" });
+        }
+        
+        const snippet = checkResult.rows[0];
+        
+        // Check ownership
+        if (snippet.userid !== userId) {
+          console.log(`[DELETE] Forbidden - snippet ${id} belongs to ${snippet.userid}, not ${userId}`);
+          return res.status(403).json({ message: "Forbidden: you don't own this snippet" });
+        }
+        
+        // Perform the delete operation
+        await client.query(
+          `DELETE FROM snippets WHERE id = $1`,
+          [id]
+        );
+        
+        console.log(`[DELETE] Snippet ${id} successfully deleted`);
+        res.status(204).send();
+      } catch (dbError) {
+        console.error(`[DELETE] Database error for ID ${id}:`, dbError);
+        res.status(500).json({ message: "Database error", error: dbError.message });
+      } finally {
+        client.release();
+      }
     } catch (err) {
-      console.error("[SNIPPETS] DELETE /api/snippets/:id error:", err);
-      res.status(500).json({ message: "Failed to delete snippet" });
+      console.error(`[DELETE] DELETE /api/snippets/${req.params.id} error:`, err);
+      res.status(500).json({ 
+        message: "Failed to delete snippet", 
+        error: err.message 
+      });
     }
   });
 
+  // REPLACEMENT: Favorite endpoint with direct database access
   app.post("/api/snippets/:id/favorite", authMiddleware, async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      const existing = await storage.getSnippet(id);
-      if (!existing) return res.status(404).json({ message: "Not found" });
-      if (existing.userId !== (req as any).user.id) {
-        return res.status(403).json({ message: "Forbidden" });
+      console.log(`[FAVORITE] Toggle favorite request received for ID: ${req.params.id}`);
+      
+      // Check authentication
+      const userId = (req as any).user?.id;
+      console.log("[FAVORITE] Auth user ID:", userId);
+      
+      if (!userId) {
+        console.error("[FAVORITE] No user ID found in request");
+        return res.status(401).json({ message: "Authentication required" });
       }
-      const toggled = await storage.toggleSnippetFavorite(id);
-      res.json(toggled);
+      
+      const id = Number(req.params.id);
+      
+      // Connect to the database directly
+      const client = await pool.connect();
+      
+      try {
+        // First check if the snippet exists and belongs to the user
+        const checkResult = await client.query(
+          `SELECT id, userid, isfavorite FROM snippets WHERE id = $1`,
+          [id]
+        );
+        
+        if (checkResult.rows.length === 0) {
+          console.log(`[FAVORITE] Snippet not found with ID: ${id}`);
+          return res.status(404).json({ message: "Snippet not found" });
+        }
+        
+        const snippet = checkResult.rows[0];
+        
+        // Check ownership
+        if (snippet.userid !== userId) {
+          console.log(`[FAVORITE] Forbidden - snippet ${id} belongs to ${snippet.userid}, not ${userId}`);
+          return res.status(403).json({ message: "Forbidden: you don't own this snippet" });
+        }
+        
+        // Toggle the favorite status
+        const newFavoriteStatus = !snippet.isfavorite;
+        
+        // Update the database
+        const updateResult = await client.query(
+          `UPDATE snippets 
+           SET isfavorite = $1, updatedat = NOW()
+           WHERE id = $2
+           RETURNING id, title, code, language, description, tags, userid, createdat, updatedat, isfavorite, ispublic, shareid, viewcount`,
+          [newFavoriteStatus, id]
+        );
+        
+        const updatedSnippet = updateResult.rows[0];
+        console.log(`[FAVORITE] Snippet ${id} favorite status toggled to ${newFavoriteStatus}`);
+        
+        // Convert column names from database format to camelCase for the response
+        const responseSnippet = {
+          id: updatedSnippet.id,
+          title: updatedSnippet.title,
+          code: updatedSnippet.code,
+          language: updatedSnippet.language,
+          description: updatedSnippet.description,
+          tags: updatedSnippet.tags || [],
+          userId: updatedSnippet.userid,
+          createdAt: updatedSnippet.createdat,
+          updatedAt: updatedSnippet.updatedat,
+          isFavorite: updatedSnippet.isfavorite,
+          isPublic: updatedSnippet.ispublic,
+          shareId: updatedSnippet.shareid,
+          viewCount: updatedSnippet.viewcount
+        };
+        
+        res.json(responseSnippet);
+      } catch (dbError) {
+        console.error(`[FAVORITE] Database error for ID ${id}:`, dbError);
+        res.status(500).json({ message: "Database error", error: dbError.message });
+      } finally {
+        client.release();
+      }
     } catch (err) {
-      console.error("[SNIPPETS] POST /api/snippets/:id/favorite error:", err);
-      res.status(500).json({ message: "Failed to toggle favorite" });
+      console.error(`[FAVORITE] POST /api/snippets/${req.params.id}/favorite error:`, err);
+      res.status(500).json({ 
+        message: "Failed to toggle favorite status", 
+        error: err.message 
+      });
     }
   });
 
