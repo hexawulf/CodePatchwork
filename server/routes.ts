@@ -140,20 +140,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/snippets/export", async (req, res) => {
+  // ENHANCED EXPORT ENDPOINT
+  app.get("/api/snippets/export", authMiddleware, async (req, res) => {
     try {
-      let list;
+      // Get all snippets for this user
+      let allSnippets;
       try {
-        list = await simpleStorage.getSnippets({});
+        allSnippets = await simpleStorage.getSnippets({});
       } catch {
-        list = await storage.getSnippets({});
+        allSnippets = await storage.getSnippets({});
       }
+      
+      const userSnippets = allSnippets.filter(s => s.userId === (req as any).user.id);
+      
+      // Format for export (only include relevant fields that would be needed for import)
+      const exportSnippets = userSnippets.map(snippet => ({
+        title: snippet.title,
+        code: snippet.code,
+        language: snippet.language,
+        description: snippet.description,
+        tags: snippet.tags,
+        isFavorite: snippet.isFavorite,
+        isPublic: snippet.isPublic
+        // Exclude id, userId, viewCount, shareId, timestamps
+      }));
+      
       res.setHeader("Content-Type", "application/json");
-      res.setHeader("Content-Disposition", `attachment; filename="snippets.json"`);
-      res.json(list);
+      res.setHeader("Content-Disposition", `attachment; filename="snippets-${new Date().toISOString().slice(0, 10)}.json"`);
+      res.json(exportSnippets);
     } catch (err) {
       console.error("[EXPORT] GET /api/snippets/export error:", err);
       res.status(500).json({ message: "Failed to export snippets", error: err.toString() });
+    }
+  });
+  
+  // NEW IMPORT ENDPOINT
+  app.post("/api/snippets/import", authMiddleware, async (req, res) => {
+    try {
+      const { snippets } = req.body;
+      
+      if (!Array.isArray(snippets)) {
+        return res.status(400).json({ 
+          message: "Invalid input: snippets must be an array" 
+        });
+      }
+      
+      const importedSnippets = [];
+      const userId = (req as any).user.id;
+      
+      for (const snippetData of snippets) {
+        try {
+          // Ensure required fields are present
+          if (!snippetData.title || !snippetData.code) {
+            console.error("[IMPORT] Skipping snippet due to missing required fields:", snippetData.title || "Untitled");
+            continue;
+          }
+          
+          // Format the snippet to match our database schema
+          const formattedSnippet = {
+            title: snippetData.title,
+            code: snippetData.code,
+            language: snippetData.language || null,
+            description: snippetData.description || null,
+            tags: Array.isArray(snippetData.tags) ? snippetData.tags : null,
+            userId: userId,
+            isFavorite: typeof snippetData.isFavorite === 'boolean' ? snippetData.isFavorite : false,
+            isPublic: typeof snippetData.isPublic === 'boolean' ? snippetData.isPublic : false
+          };
+          
+          // Validate with schema
+          const validatedSnippet = insertSnippetSchema.parse(formattedSnippet);
+          
+          // Create the snippet
+          const createdSnippet = await storage.createSnippet(validatedSnippet);
+          importedSnippets.push(createdSnippet);
+        } catch (snippetError) {
+          console.error("[IMPORT] Error importing snippet:", snippetError);
+          // Continue with other snippets even if one fails
+        }
+      }
+      
+      res.status(201).json({ 
+        message: `Successfully imported ${importedSnippets.length} snippets.`, 
+        snippets: importedSnippets 
+      });
+    } catch (err: any) {
+      console.error("[IMPORT] POST /api/snippets/import error:", err);
+      res.status(500).json({ 
+        message: "Failed to import snippets", 
+        error: err.message 
+      });
     }
   });
 

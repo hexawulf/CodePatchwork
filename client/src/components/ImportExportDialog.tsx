@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { UploadCloud, Download, AlertCircle } from "lucide-react";
+import { getAuth } from "firebase/auth";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 interface ImportExportDialogProps {
   open: boolean;
@@ -20,6 +22,7 @@ export default function ImportExportDialog({
 }: ImportExportDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuthContext();
   const [activeTab, setActiveTab] = useState("import");
   const [importData, setImportData] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +33,37 @@ export default function ImportExportDialog({
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Ensure user is authenticated
+      if (!user) {
+        setError("You must be logged in to import snippets.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Get Firebase auth instance and current user
+      const auth = getAuth();
+      const firebaseUser = auth.currentUser;
+      
+      // Check if Firebase user exists
+      if (!firebaseUser) {
+        console.error("Firebase user not found but local user exists");
+        setError("Authentication error. Please try logging in again.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Get id token
+      let token;
+      try {
+        token = await firebaseUser.getIdToken(true);
+        console.log("Got Firebase ID token for API request");
+      } catch (tokenError) {
+        console.error("Failed to get ID token:", tokenError);
+        setError("Authentication token error. Please refresh the page and try again.");
+        setIsLoading(false);
+        return;
+      }
       
       // Validate JSON format
       let snippetsData;
@@ -42,25 +76,51 @@ export default function ImportExportDialog({
       }
       
       // Ensure snippets is an array
-      const snippets = Array.isArray(snippetsData) ? snippetsData : [snippetsData];
+      const rawSnippets = Array.isArray(snippetsData) ? snippetsData : [snippetsData];
       
-      // Send to API
+      // Clean the snippets to remove any ID fields and auto-generated fields
+      const cleanSnippets = rawSnippets.map(snippet => {
+        // Only keep the fields we want to import
+        return {
+          title: snippet.title || "Untitled Snippet",
+          code: snippet.code || "",
+          language: snippet.language || "text",
+          description: snippet.description || "",
+          tags: Array.isArray(snippet.tags) ? snippet.tags : [],
+          // User ID will be set on the server side from the auth token
+        };
+      });
+      
+      console.log(`Importing ${cleanSnippets.length} snippets...`);
+      
+      // Send to API with auth token
       const response = await fetch("/api/snippets/import", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ snippets })
+        body: JSON.stringify({ snippets: cleanSnippets })
       });
       
+      // Handle non-2xx responses
       if (!response.ok) {
-        throw new Error("Failed to import snippets");
+        const errorText = await response.text();
+        console.error("Import response error:", response.status, errorText);
+        throw new Error(`Server returned ${response.status}: ${response.statusText || errorText}`);
       }
       
       const result = await response.json();
+      console.log("Import successful:", result);
       
-      // Refresh snippets data
-      queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
+      // Refresh snippets data - try different query keys
+      queryClient.invalidateQueries({ queryKey: ['snippets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
+      
+      // Force a complete refresh after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
       
       // Show success message
       toast({
@@ -70,8 +130,9 @@ export default function ImportExportDialog({
       
       // Close dialog
       onOpenChange(false);
-    } catch (err) {
-      setError("Failed to import snippets. Please try again.");
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to import snippets";
+      setError(`${errorMessage}. Please try again.`);
       console.error("Import error:", err);
     } finally {
       setIsLoading(false);
@@ -79,16 +140,65 @@ export default function ImportExportDialog({
   };
   
   // Handle Export
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
-      // Create a download link and trigger it
+      setIsLoading(true);
+      
+      // Ensure user is authenticated
+      if (!user) {
+        setError("You must be logged in to export snippets.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Get Firebase auth instance and current user
+      const auth = getAuth();
+      const firebaseUser = auth.currentUser;
+      
+      if (!firebaseUser) {
+        setError("Authentication error. Please try logging in again.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Get id token
+      const token = await firebaseUser.getIdToken(true);
+      
+      // Create a download with authenticated request
       const exportUrl = "/api/snippets/export";
+      
+      // For authenticated downloads, we need to use fetch with credentials
+      // and then create a blob URL from the response
+      const response = await fetch(exportUrl, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
+      }
+      
+      // Get the response data as JSON
+      const snippetsData = await response.json();
+      
+      // Create a blob URL
+      const blob = new Blob([JSON.stringify(snippetsData, null, 2)], { 
+        type: "application/json" 
+      });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create a download link and trigger it
       const link = document.createElement("a");
-      link.href = exportUrl;
-      link.download = "codepatchwork-snippets.json";
+      link.href = blobUrl;
+      link.download = `codepatchwork-snippets-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);
       link.click();
+      
+      // Clean up
       document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
       // Show success toast
       toast({
@@ -98,9 +208,12 @@ export default function ImportExportDialog({
       
       // Close dialog
       onOpenChange(false);
-    } catch (err) {
-      setError("Failed to export snippets. Please try again.");
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to export snippets";
+      setError(`${errorMessage}. Please try again.`);
       console.error("Export error:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -177,6 +290,13 @@ export default function ImportExportDialog({
                   Download all your snippets as a JSON file that you can import later or share with others.
                 </p>
               </div>
+              
+              {error && (
+                <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-start">
+                  <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">{error}</p>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
@@ -191,8 +311,8 @@ export default function ImportExportDialog({
               {isLoading ? "Importing..." : "Import Snippets"}
             </Button>
           ) : (
-            <Button onClick={handleExport}>
-              Export Snippets
+            <Button onClick={handleExport} disabled={isLoading}>
+              {isLoading ? "Exporting..." : "Export Snippets"}
             </Button>
           )}
         </DialogFooter>
