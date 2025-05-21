@@ -140,6 +140,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+// TEST IMPORT ENDPOINT (no auth required)
+app.post("/api/test-import", async (req, res) => {
+  console.log("TEST IMPORT ENDPOINT HIT");
+  try {
+    console.log("Request body:", JSON.stringify(req.body));
+    
+    const { snippets } = req.body;
+    
+    if (!Array.isArray(snippets)) {
+      console.error("Invalid input: snippets is not an array");
+      return res.status(400).json({ 
+        message: "Invalid input: snippets must be an array" 
+      });
+    }
+    
+    console.log(`Processing ${snippets.length} snippets for import`);
+    
+    // Try a direct database insertion for testing
+    const testSnippet = snippets[0];
+    
+    if (!testSnippet) {
+      return res.status(400).json({ message: "No snippets provided" });
+    }
+    
+    // Connect directly to the database
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `INSERT INTO snippets (title, code, language, user_id, created_at, updated_at) 
+         VALUES ($1, $2, $3, 1, NOW(), NOW()) RETURNING id, title`,
+        [testSnippet.title, testSnippet.code, testSnippet.language]
+      );
+      
+      console.log("Direct DB insert result:", result.rows[0]);
+      
+      res.status(201).json({ 
+        message: "Test import successful", 
+        snippet: result.rows[0]
+      });
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+      res.status(500).json({ message: "Database error", error: dbError.message });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error("TEST IMPORT error:", err);
+    res.status(500).json({ 
+      message: "Test import failed", 
+      error: err.message 
+    });
+  }
+});
+// END OF TEST IMPORT ENDPOINT
+
+
   // ENHANCED EXPORT ENDPOINT
   app.get("/api/snippets/export", authMiddleware, async (req, res) => {
     try {
@@ -174,64 +230,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // NEW IMPORT ENDPOINT
-  app.post("/api/snippets/import", authMiddleware, async (req, res) => {
-    try {
-      const { snippets } = req.body;
-      
-      if (!Array.isArray(snippets)) {
-        return res.status(400).json({ 
-          message: "Invalid input: snippets must be an array" 
-        });
-      }
-      
-      const importedSnippets = [];
-      const userId = (req as any).user.id;
-      
-      for (const snippetData of snippets) {
-        try {
-          // Ensure required fields are present
-          if (!snippetData.title || !snippetData.code) {
-            console.error("[IMPORT] Skipping snippet due to missing required fields:", snippetData.title || "Untitled");
-            continue;
-          }
-          
-          // Format the snippet to match our database schema
-          const formattedSnippet = {
-            title: snippetData.title,
-            code: snippetData.code,
-            language: snippetData.language || null,
-            description: snippetData.description || null,
-            tags: Array.isArray(snippetData.tags) ? snippetData.tags : null,
-            userId: userId,
-            isFavorite: typeof snippetData.isFavorite === 'boolean' ? snippetData.isFavorite : false,
-            isPublic: typeof snippetData.isPublic === 'boolean' ? snippetData.isPublic : false
-          };
-          
-          // Validate with schema
-          const validatedSnippet = insertSnippetSchema.parse(formattedSnippet);
-          
-          // Create the snippet
-          const createdSnippet = await storage.createSnippet(validatedSnippet);
-          importedSnippets.push(createdSnippet);
-        } catch (snippetError) {
-          console.error("[IMPORT] Error importing snippet:", snippetError);
-          // Continue with other snippets even if one fails
-        }
-      }
-      
-      res.status(201).json({ 
-        message: `Successfully imported ${importedSnippets.length} snippets.`, 
-        snippets: importedSnippets 
-      });
-    } catch (err: any) {
-      console.error("[IMPORT] POST /api/snippets/import error:", err);
-      res.status(500).json({ 
-        message: "Failed to import snippets", 
-        error: err.message 
+
+// NEW IMPORT ENDPOINT with enhanced logging
+app.post("/api/snippets/import", authMiddleware, async (req, res) => {
+  try {
+    console.log("[IMPORT] Import request received");
+    
+    // Check authentication
+    const userId = (req as any).user?.id;
+    console.log("[IMPORT] Auth user ID:", userId);
+    
+    if (!userId) {
+      console.error("[IMPORT] No user ID found in request");
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    // Log request body
+    console.log("[IMPORT] Request body structure:", JSON.stringify({
+      snippetsArrayLength: Array.isArray(req.body.snippets) ? req.body.snippets.length : 'not an array',
+      firstSnippetSample: Array.isArray(req.body.snippets) && req.body.snippets.length > 0 
+        ? { title: req.body.snippets[0].title, language: req.body.snippets[0].language } 
+        : 'no snippets'
+    }));
+    
+    const { snippets } = req.body;
+    
+    if (!Array.isArray(snippets)) {
+      console.error("[IMPORT] Invalid input: snippets is not an array");
+      return res.status(400).json({ 
+        message: "Invalid input: snippets must be an array" 
       });
     }
-  });
+    
+    console.log(`[IMPORT] Processing ${snippets.length} snippets for import`);
+    
+    // Track results
+    const importResults = {
+      success: [],
+      failed: []
+    };
+    
+    // Process each snippet
+    for (let i = 0; i < snippets.length; i++) {
+      try {
+        const snippetData = snippets[i];
+        console.log(`[IMPORT] Processing snippet ${i+1}/${snippets.length}:`, 
+          JSON.stringify({
+            title: snippetData.title || 'untitled',
+            language: snippetData.language || 'unknown',
+            codeLength: snippetData.code ? snippetData.code.length : 0,
+            hasDescription: !!snippetData.description,
+            tagsCount: Array.isArray(snippetData.tags) ? snippetData.tags.length : 0
+          })
+        );
+        
+        // Ensure required fields are present
+        if (!snippetData.title || !snippetData.code) {
+          console.error(`[IMPORT] Snippet ${i+1} missing required fields:`, 
+            JSON.stringify({ 
+              hasTitle: !!snippetData.title, 
+              hasCode: !!snippetData.code 
+            })
+          );
+          importResults.failed.push({ 
+            index: i, 
+            title: snippetData.title || 'untitled',
+            reason: "Missing required fields" 
+          });
+          continue;
+        }
+        
+        // Format the snippet to match our database schema
+        const formattedSnippet = {
+          title: snippetData.title,
+          code: snippetData.code,
+          language: snippetData.language || null,
+          description: snippetData.description || null,
+          tags: Array.isArray(snippetData.tags) ? snippetData.tags : null,
+          userId: userId, // Use validated user ID from auth
+          isFavorite: typeof snippetData.isFavorite === 'boolean' ? snippetData.isFavorite : false,
+          isPublic: typeof snippetData.isPublic === 'boolean' ? snippetData.isPublic : false
+        };
+        
+        console.log(`[IMPORT] Formatted snippet ${i+1}:`, JSON.stringify({
+          title: formattedSnippet.title,
+          language: formattedSnippet.language,
+          userId: formattedSnippet.userId,
+          tagsCount: Array.isArray(formattedSnippet.tags) ? formattedSnippet.tags.length : 0
+        }));
+        
+        // Validate with schema
+        try {
+          console.log(`[IMPORT] Validating snippet ${i+1} with schema`);
+          const validatedSnippet = insertSnippetSchema.parse(formattedSnippet);
+          console.log(`[IMPORT] Schema validation passed for snippet ${i+1}`);
+          
+          // Create the snippet
+          console.log(`[IMPORT] Calling storage.createSnippet for snippet ${i+1}`);
+          const createdSnippet = await storage.createSnippet(validatedSnippet);
+          console.log(`[IMPORT] Snippet ${i+1} created successfully with ID:`, createdSnippet.id);
+          
+          importResults.success.push(createdSnippet);
+        } catch (validationError: any) {
+          console.error(`[IMPORT] Schema validation error for snippet ${i+1}:`, validationError);
+          importResults.failed.push({ 
+            index: i, 
+            title: snippetData.title,
+            reason: validationError instanceof z.ZodError 
+              ? JSON.stringify(validationError.errors) 
+              : validationError.message 
+          });
+          continue;
+        }
+      } catch (snippetError: any) {
+        console.error(`[IMPORT] Error processing snippet ${i+1}:`, snippetError);
+        importResults.failed.push({ 
+          index: i, 
+          title: snippets[i]?.title || 'unknown',
+          reason: snippetError.message 
+        });
+        // Continue with other snippets even if one fails
+      }
+    }
+    
+    console.log("[IMPORT] Import completed. Results:", JSON.stringify({
+      successCount: importResults.success.length,
+      failedCount: importResults.failed.length
+    }));
+    
+    // Return appropriate response
+    res.status(201).json({ 
+      message: `Successfully imported ${importResults.success.length} snippets. ${importResults.failed.length > 0 ? `Failed to import ${importResults.failed.length} snippets.` : ''}`, 
+      success: importResults.success.map(s => ({ id: s.id, title: s.title })),
+      failed: importResults.failed
+    });
+  } catch (err: any) {
+    console.error("[IMPORT] POST /api/snippets/import error:", err);
+    res.status(500).json({ 
+      message: "Failed to import snippets", 
+      error: err.message 
+    });
+  }
+}); 
+
+// ────────────────────────────────────────────────────────────────
+// END OF IMPORT ENDPOINT
+// ────────────────────────────────────────────────────────────────
 
   app.get("/api/snippets/:id", async (req, res) => {
     try {
