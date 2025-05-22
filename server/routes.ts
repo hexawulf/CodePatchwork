@@ -1,4 +1,4 @@
-// server/routes.ts
+// server/routes.ts - FIXED VERSION
 import type { Express, Request, Response, NextFunction, RequestHandler } from "express";
 import { createServer, type Server }                from "http";
 import admin                                        from "firebase-admin";
@@ -49,12 +49,11 @@ export const authMiddleware: RequestHandler = async (req, res, next) => {
 
 /** ─── 3) Register all routes ─────────────────────────────────────────────── */
 export async function registerRoutes(app: Express): Promise<Server> {
-  // ─── 3.1) NEW: Firebase Auth endpoints ──────────────────────────────────
+  // ─── 3.1) Firebase Auth endpoints ──────────────────────────────────
 
   app.post("/api/auth/user", async (req: Request, res: Response) => {
     const { idToken, uid, email, displayName, photoURL } = req.body as any;
 
-    // if neither JWT nor uid is supplied → bad request
     if (!idToken && !uid) {
       return res
         .status(400)
@@ -62,7 +61,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      // build a normalized user record
       let userRecord: {
         id: string;
         email: string | null;
@@ -71,7 +69,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       if (idToken) {
-        // verify the Firebase JWT
         const decoded = await admin.auth().verifyIdToken(idToken);
         userRecord = {
           id: decoded.uid,
@@ -80,7 +77,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           photoURL: decoded.picture    ?? null,
         };
       } else {
-        // fallback: trust the client-provided fields
         userRecord = {
           id: uid,
           email: email        ?? null,
@@ -89,7 +85,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
 
-      // upsert into your users table
       const user = await storage.upsertUser(userRecord);
       return res.status(201).json(user);
     } catch (err: any) {
@@ -102,145 +97,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/me", authMiddleware, (_req, res) => {
-    // req.user was attached by your authMiddleware
     res.json(( _req as any ).user);
   });
-  // ──────────────────────────────────────────────────────────────────────────
-  // ─── 3.2) Your existing snippet, collection, comment, etc. endpoints go here ─
-  //      (Everything from app.get("/api/snippets") on down stays exactly as before.)
-  //
-  //      e.g.:
-  //      app.get("/api/snippets", async (req, res) => { … });
-  //      // Replace the POST /api/snippets route with this modified version
-// that checks for authentication but also allows creation with a default user
-
-app.post("/api/snippets", async (req, res) => {
-  try {
-    console.log("[CREATE] Create snippet request received");
-    
-    // Log request headers to diagnose authentication issues
-    console.log("[CREATE] Request headers:", JSON.stringify({
-      auth: req.headers.authorization ? "Present" : "Missing",
-      contentType: req.headers['content-type']
-    }));
-    
-    // Log request body
-    console.log("[CREATE] Request body:", JSON.stringify({
-      title: req.body.title,
-      language: req.body.language,
-      codeLength: req.body.code ? req.body.code.length : 0,
-      hasDescription: !!req.body.description,
-      tagsCount: Array.isArray(req.body.tags) ? req.body.tags.length : 0
-    }));
-    
-    // Get user ID from auth if available
-    let userId = 'guest-user';
-    
-    // Try to get authenticated user if token is present
-    if (req.headers.authorization?.startsWith("Bearer ")) {
-      try {
-        const idToken = req.headers.authorization.split(" ")[1];
-        const decoded = await admin.auth().verifyIdToken(idToken);
-        const user = await storage.getUser(decoded.uid);
-        if (user) {
-          userId = user.id;
-          console.log("[CREATE] Authenticated user ID:", userId);
-        }
-      } catch (authError) {
-        console.log("[CREATE] Auth error, using default user:", authError.message);
-        // Continue with default user
-      }
-    } else {
-      console.log("[CREATE] No auth token, using default user");
-    }
-    
-    // Validate required fields
-    if (!req.body.title || !req.body.code) {
-      console.error("[CREATE] Missing required fields:", 
-        JSON.stringify({ 
-          hasTitle: !!req.body.title, 
-          hasCode: !!req.body.code 
-        })
-      );
-      return res.status(400).json({ 
-        message: "Title and code are required" 
-      });
-    }
-    
-    // Connect to the database directly to ensure correct column names
-    const client = await pool.connect();
-    
-    try {
-      // Direct database insertion using correct column names
-      const result = await client.query(
-        `INSERT INTO snippets (
-          title, code, language, description, userid, 
-          createdat, updatedat, tags, isfavorite, ispublic
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), $6, $7, $8) 
-        RETURNING id, title, code, language, description, tags, isfavorite, ispublic, createdat, updatedat`,
-        [
-          req.body.title, 
-          req.body.code, 
-          req.body.language || null,
-          req.body.description || null,
-          userId,
-          Array.isArray(req.body.tags) ? req.body.tags : (req.body.tags ? [req.body.tags] : null),
-          req.body.isFavorite === true, // Default to false if not provided
-          req.body.isPublic === true    // Default to false if not provided
-        ]
-      );
-      
-      if (result.rows.length === 0) {
-        throw new Error("Failed to create snippet");
-      }
-      
-      const createdSnippet = result.rows[0];
-      console.log("[CREATE] Snippet created successfully with ID:", createdSnippet.id);
-      
-      // Convert column names from database format to camelCase for the response
-      const responseSnippet = {
-        id: createdSnippet.id,
-        title: createdSnippet.title,
-        code: createdSnippet.code,
-        language: createdSnippet.language,
-        description: createdSnippet.description,
-        tags: createdSnippet.tags,
-        userId: userId,
-        isFavorite: createdSnippet.isfavorite,
-        isPublic: createdSnippet.ispublic,
-        createdAt: createdSnippet.createdat,
-        updatedAt: createdSnippet.updatedat
-      };
-      
-      res.status(201).json(responseSnippet);
-    } catch (dbError) {
-      console.error("[CREATE] Database error:", dbError);
-      res.status(500).json({ message: "Database error", error: dbError.message });
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    console.error("[CREATE] POST /api/snippets error:", err);
-    res.status(500).json({ 
-      message: "Failed to create snippet", 
-      error: err.message 
-    });
-  }
-});
-  //      …and so on…
-  //
-  // ──────────────────────────────────────────────────────────────────────────
 
   // ────────────────────────────────────────────────────────────────
-  //   2) Snippets endpoints
+  // ─── 3.2) Snippets endpoints ─────────────────────────────────────
   // ────────────────────────────────────────────────────────────────
   
-  // Keeping public access for GET /api/snippets (NO authMiddleware)
+  // GET all snippets (public access)
   app.get("/api/snippets", async (req, res) => {
     try {
       console.log("[GET_ALL] Get all snippets request received");
       
-      // Apply filters if any
       const filters: any = {};
       if (req.query.search) filters.search = String(req.query.search);
       if (req.query.language) filters.language = req.query.language;
@@ -248,14 +116,12 @@ app.post("/api/snippets", async (req, res) => {
       if (req.query.favorites === "true") filters.favorites = true;
       
       try {
-        // First try with simpleStorage
         const list = await simpleStorage.getSnippets(filters);
         console.log(`[GET_ALL] Found ${list.length} snippets using simpleStorage`);
         return res.json(list);
       } catch (simpleError) {
         console.log("[GET_ALL] SimpleStorage failed, falling back to storage", simpleError);
         
-        // Fall back to storage if simpleStorage fails
         try {
           const list = await storage.getSnippets(filters);
           console.log(`[GET_ALL] Found ${list.length} snippets using storage`);
@@ -263,10 +129,8 @@ app.post("/api/snippets", async (req, res) => {
         } catch (storageError) {
           console.error("[GET_ALL] Storage also failed:", storageError);
           
-          // If both fail, try direct database access as last resort
           const client = await pool.connect();
           try {
-            // Build query based on filters
             let query = `
               SELECT id, title, code, language, description, tags, userid, createdat, updatedat, 
                     isfavorite, ispublic, shareid, viewcount 
@@ -275,7 +139,6 @@ app.post("/api/snippets", async (req, res) => {
             `;
             const params: any[] = [];
             
-            // Add additional filters
             if (filters.search) {
               query += ` AND (title ILIKE $${params.length + 1} OR description ILIKE $${params.length + 1})`;
               params.push(`%${filters.search}%`);
@@ -295,15 +158,12 @@ app.post("/api/snippets", async (req, res) => {
               query += ` AND isfavorite = true`;
             }
             
-            // Order by most recently updated
             query += ` ORDER BY updatedat DESC`;
             
-            // Execute query
             const result = await client.query(query, params);
             
             console.log(`[GET_ALL] Found ${result.rows.length} snippets directly from DB`);
             
-            // Convert column names from database format to camelCase for the response
             const snippets = result.rows.map(row => ({
               id: row.id,
               title: row.title,
@@ -329,7 +189,7 @@ app.post("/api/snippets", async (req, res) => {
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("[GET_ALL] GET /api/snippets error:", err);
       res.status(500).json({ 
         message: "Failed to get snippets", 
@@ -338,224 +198,17 @@ app.post("/api/snippets", async (req, res) => {
     }
   });
 
-  // TEST IMPORT ENDPOINT (no auth required)
-  app.post("/api/test-import", async (req, res) => {
-    console.log("TEST IMPORT ENDPOINT HIT");
-    try {
-      console.log("Request body:", JSON.stringify(req.body));
-      
-      const { snippets } = req.body;
-      
-      if (!Array.isArray(snippets)) {
-        console.error("Invalid input: snippets is not an array");
-        return res.status(400).json({ 
-          message: "Invalid input: snippets must be an array" 
-        });
-      }
-      
-      console.log(`Processing ${snippets.length} snippets for import`);
-      
-      // Try a direct database insertion for testing
-      const testSnippet = snippets[0];
-      
-      if (!testSnippet) {
-        return res.status(400).json({ message: "No snippets provided" });
-      }
-      
-      // Connect directly to the database with correct column names
-      const client = await pool.connect();
-      try {
-        const result = await client.query(
-          `INSERT INTO snippets (title, code, language, userid, createdat, updatedat, tags, isfavorite, ispublic) 
-           VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7) RETURNING id, title`,
-          [
-            testSnippet.title, 
-            testSnippet.code, 
-            testSnippet.language || null,
-            'test-user-id', // Use a test user ID
-            Array.isArray(testSnippet.tags) ? testSnippet.tags : null,
-            false, // isfavorite
-            false  // ispublic
-          ]
-        );
-        
-        console.log("Direct DB insert result:", result.rows[0]);
-        
-        res.status(201).json({ 
-          message: "Test import successful", 
-          snippet: result.rows[0]
-        });
-      } catch (dbError) {
-        console.error("Database error:", dbError);
-        res.status(500).json({ message: "Database error", error: dbError.message });
-      } finally {
-        client.release();
-      }
-    } catch (err) {
-      console.error("TEST IMPORT error:", err);
-      res.status(500).json({ 
-        message: "Test import failed", 
-        error: err.message 
-      });
-    }
-  });
-  // END OF TEST IMPORT ENDPOINT
-
-
-  // NEW IMPORT ENDPOINT with enhanced logging
-  app.post("/api/snippets/import", authMiddleware, async (req, res) => {
-    try {
-      console.log("[IMPORT] Import request received");
-      
-      // Check authentication - user ID is in req.user.id from authMiddleware
-      const userId = (req as any).user?.id;
-      console.log("[IMPORT] Auth user ID:", userId);
-      
-      if (!userId) {
-        console.error("[IMPORT] No user ID found in request");
-        return res.status(401).json({ message: "Authentication required" });
-      }
-      
-      // Log request body
-      console.log("[IMPORT] Request body structure:", JSON.stringify({
-        snippetsArrayLength: Array.isArray(req.body.snippets) ? req.body.snippets.length : 'not an array',
-        firstSnippetSample: Array.isArray(req.body.snippets) && req.body.snippets.length > 0 
-          ? { title: req.body.snippets[0].title, language: req.body.snippets[0].language } 
-          : 'no snippets'
-      }));
-      
-      const { snippets } = req.body;
-      
-      if (!Array.isArray(snippets)) {
-        console.error("[IMPORT] Invalid input: snippets is not an array");
-        return res.status(400).json({ 
-          message: "Invalid input: snippets must be an array" 
-        });
-      }
-      
-      console.log(`[IMPORT] Processing ${snippets.length} snippets for import`);
-      
-      // Track results
-      const importResults = {
-        success: [],
-        failed: []
-      };
-      
-      // Connect to the database directly to ensure correct column names
-      const client = await pool.connect();
-      
-      // Process each snippet
-      for (let i = 0; i < snippets.length; i++) {
-        try {
-          const snippetData = snippets[i];
-          console.log(`[IMPORT] Processing snippet ${i+1}/${snippets.length}:`, 
-            JSON.stringify({
-              title: snippetData.title || 'untitled',
-              language: snippetData.language || 'unknown',
-              codeLength: snippetData.code ? snippetData.code.length : 0,
-              hasDescription: !!snippetData.description,
-              tagsCount: Array.isArray(snippetData.tags) ? snippetData.tags.length : 0
-            })
-          );
-          
-          // Ensure required fields are present
-          if (!snippetData.title || !snippetData.code) {
-            console.error(`[IMPORT] Snippet ${i+1} missing required fields:`, 
-              JSON.stringify({ 
-                hasTitle: !!snippetData.title, 
-                hasCode: !!snippetData.code 
-              })
-            );
-            importResults.failed.push({ 
-              index: i, 
-              title: snippetData.title || 'untitled',
-              reason: "Missing required fields" 
-            });
-            continue;
-          }
-          
-          // Direct database insertion using correct column names
-          try {
-            const result = await client.query(
-              `INSERT INTO snippets (
-                title, code, language, description, userid, 
-                createdat, updatedat, tags, isfavorite, ispublic
-              ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), $6, $7, $8) 
-              RETURNING id, title`,
-              [
-                snippetData.title, 
-                snippetData.code, 
-                snippetData.language || null,
-                snippetData.description || null,
-                userId, // This should be the Firebase UID from authMiddleware
-                Array.isArray(snippetData.tags) ? snippetData.tags : null,
-                typeof snippetData.isFavorite === 'boolean' ? snippetData.isFavorite : false,
-                typeof snippetData.isPublic === 'boolean' ? snippetData.isPublic : false
-              ]
-            );
-            
-            console.log(`[IMPORT] Snippet ${i+1} created successfully with ID:`, result.rows[0].id);
-            importResults.success.push(result.rows[0]);
-          } catch (dbError) {
-            console.error(`[IMPORT] Database error for snippet ${i+1}:`, dbError);
-            importResults.failed.push({ 
-              index: i, 
-              title: snippetData.title,
-              reason: dbError.message 
-            });
-            continue;
-          }
-        } catch (snippetError) {
-          console.error(`[IMPORT] Error processing snippet ${i+1}:`, snippetError);
-          importResults.failed.push({ 
-            index: i, 
-            title: snippets[i]?.title || 'unknown',
-            reason: snippetError.message 
-          });
-          // Continue with other snippets even if one fails
-        }
-      }
-      
-      // Release database client
-      client.release();
-      
-      console.log("[IMPORT] Import completed. Results:", JSON.stringify({
-        successCount: importResults.success.length,
-        failedCount: importResults.failed.length
-      }));
-      
-      // Return appropriate response
-      res.status(201).json({ 
-        message: `Successfully imported ${importResults.success.length} snippets. ${importResults.failed.length > 0 ? `Failed to import ${importResults.failed.length} snippets.` : ''}`, 
-        success: importResults.success.map(s => ({ id: s.id, title: s.title })),
-        failed: importResults.failed
-      });
-    } catch (err) {
-      console.error("[IMPORT] POST /api/snippets/import error:", err);
-      res.status(500).json({ 
-        message: "Failed to import snippets", 
-        error: err.message 
-      });
-    }
-  }); 
-  // ────────────────────────────────────────────────────────────────
-  // END OF IMPORT ENDPOINT
-  // ────────────────────────────────────────────────────────────────
-
-  // Keep public access for GET /api/snippets/:id (NO authMiddleware)
+  // GET single snippet by ID (public access)
   app.get("/api/snippets/:id", async (req, res) => {
     try {
       console.log(`[GET_ONE] Get snippet request received for ID: ${req.params.id}`);
       
       const id = Number(req.params.id);
       
-      // First try with simpleStorage and storage methods
       try {
-        // Try simpleStorage first
         const snippet = await simpleStorage.getSnippet(id);
         console.log(`[GET_ONE] Found snippet with ID: ${id} using simpleStorage`);
         
-        // Increment view count
         await storage.incrementSnippetViewCount(id);
         
         return res.json(snippet);
@@ -563,7 +216,6 @@ app.post("/api/snippets", async (req, res) => {
         console.log("[GET_ONE] SimpleStorage failed, trying storage", simpleError);
         
         try {
-          // Try regular storage next
           const snippet = await storage.getSnippet(id);
           if (!snippet) {
             console.log(`[GET_ONE] Snippet not found with ID: ${id}`);
@@ -572,17 +224,14 @@ app.post("/api/snippets", async (req, res) => {
           
           console.log(`[GET_ONE] Found snippet with ID: ${id} using storage`);
           
-          // Increment view count
           await storage.incrementSnippetViewCount(id);
           
           return res.json(snippet);
         } catch (storageError) {
           console.error("[GET_ONE] Storage also failed:", storageError);
           
-          // Direct database access as last resort
           const client = await pool.connect();
           try {
-            // Directly query the database with correct column names
             const result = await client.query(
               `SELECT id, title, code, language, description, tags, userid, createdat, updatedat, 
                       isfavorite, ispublic, shareid, viewcount 
@@ -599,7 +248,6 @@ app.post("/api/snippets", async (req, res) => {
             const row = result.rows[0];
             console.log(`[GET_ONE] Found snippet with ID: ${row.id} directly from DB`);
             
-            // Convert column names from database format to camelCase for the response
             const snippet = {
               id: row.id,
               title: row.title,
@@ -616,7 +264,6 @@ app.post("/api/snippets", async (req, res) => {
               viewCount: row.viewcount
             };
             
-            // Increment view count
             await client.query(
               `UPDATE snippets SET viewcount = viewcount + 1 WHERE id = $1`,
               [id]
@@ -631,7 +278,7 @@ app.post("/api/snippets", async (req, res) => {
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(`[GET_ONE] GET /api/snippets/${req.params.id} error:`, err);
       res.status(500).json({ 
         message: "Failed to get snippet", 
@@ -640,12 +287,11 @@ app.post("/api/snippets", async (req, res) => {
     }
   });
 
-  // Keep auth requirements for creating new snippets
+  // CREATE new snippet (requires authentication)
   app.post("/api/snippets", authMiddleware, async (req, res) => {
     try {
       console.log("[CREATE] Create snippet request received");
       
-      // Check authentication
       const userId = (req as any).user?.id;
       console.log("[CREATE] Auth user ID:", userId);
       
@@ -654,7 +300,6 @@ app.post("/api/snippets", async (req, res) => {
         return res.status(401).json({ message: "Authentication required" });
       }
       
-      // Log request body
       console.log("[CREATE] Request body:", JSON.stringify({
         title: req.body.title,
         language: req.body.language,
@@ -663,7 +308,6 @@ app.post("/api/snippets", async (req, res) => {
         tagsCount: Array.isArray(req.body.tags) ? req.body.tags.length : 0
       }));
       
-      // Validate required fields
       if (!req.body.title || !req.body.code) {
         console.error("[CREATE] Missing required fields:", 
           JSON.stringify({ 
@@ -676,11 +320,9 @@ app.post("/api/snippets", async (req, res) => {
         });
       }
       
-      // Connect to the database directly to ensure correct column names
       const client = await pool.connect();
       
       try {
-        // Direct database insertion using correct column names
         const result = await client.query(
           `INSERT INTO snippets (
             title, code, language, description, userid, 
@@ -694,8 +336,8 @@ app.post("/api/snippets", async (req, res) => {
             req.body.description || null,
             userId,
             Array.isArray(req.body.tags) ? req.body.tags : (req.body.tags ? [req.body.tags] : null),
-            req.body.isFavorite === true, // Default to false if not provided
-            req.body.isPublic === true    // Default to false if not provided
+            req.body.isFavorite === true,
+            req.body.isPublic === true
           ]
         );
         
@@ -706,7 +348,6 @@ app.post("/api/snippets", async (req, res) => {
         const createdSnippet = result.rows[0];
         console.log("[CREATE] Snippet created successfully with ID:", createdSnippet.id);
         
-        // Convert column names from database format to camelCase for the response
         const responseSnippet = {
           id: createdSnippet.id,
           title: createdSnippet.title,
@@ -722,13 +363,13 @@ app.post("/api/snippets", async (req, res) => {
         };
         
         res.status(201).json(responseSnippet);
-      } catch (dbError) {
+      } catch (dbError: any) {
         console.error("[CREATE] Database error:", dbError);
         res.status(500).json({ message: "Database error", error: dbError.message });
       } finally {
         client.release();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("[CREATE] POST /api/snippets error:", err);
       res.status(500).json({ 
         message: "Failed to create snippet", 
@@ -737,6 +378,7 @@ app.post("/api/snippets", async (req, res) => {
     }
   });
 
+  // UPDATE snippet (requires authentication)
   app.put("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -757,12 +399,11 @@ app.post("/api/snippets", async (req, res) => {
     }
   });
 
-  // REPLACEMENT: Delete endpoint with direct database access
+  // DELETE snippet (requires authentication)
   app.delete("/api/snippets/:id", authMiddleware, async (req, res) => {
     try {
       console.log(`[DELETE] Delete snippet request received for ID: ${req.params.id}`);
       
-      // Check authentication
       const userId = (req as any).user?.id;
       console.log("[DELETE] Auth user ID:", userId);
       
@@ -773,11 +414,9 @@ app.post("/api/snippets", async (req, res) => {
       
       const id = Number(req.params.id);
       
-      // Connect to the database directly
       const client = await pool.connect();
       
       try {
-        // First check if the snippet exists and belongs to the user
         const checkResult = await client.query(
           `SELECT id, userid FROM snippets WHERE id = $1`,
           [id]
@@ -790,13 +429,11 @@ app.post("/api/snippets", async (req, res) => {
         
         const snippet = checkResult.rows[0];
         
-        // Check ownership
         if (snippet.userid !== userId) {
           console.log(`[DELETE] Forbidden - snippet ${id} belongs to ${snippet.userid}, not ${userId}`);
           return res.status(403).json({ message: "Forbidden: you don't own this snippet" });
         }
         
-        // Perform the delete operation
         await client.query(
           `DELETE FROM snippets WHERE id = $1`,
           [id]
@@ -804,13 +441,13 @@ app.post("/api/snippets", async (req, res) => {
         
         console.log(`[DELETE] Snippet ${id} successfully deleted`);
         res.status(204).send();
-      } catch (dbError) {
+      } catch (dbError: any) {
         console.error(`[DELETE] Database error for ID ${id}:`, dbError);
         res.status(500).json({ message: "Database error", error: dbError.message });
       } finally {
         client.release();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(`[DELETE] DELETE /api/snippets/${req.params.id} error:`, err);
       res.status(500).json({ 
         message: "Failed to delete snippet", 
@@ -819,12 +456,11 @@ app.post("/api/snippets", async (req, res) => {
     }
   });
 
-  // REPLACEMENT: Favorite endpoint with direct database access
+  // TOGGLE FAVORITE (requires authentication)
   app.post("/api/snippets/:id/favorite", authMiddleware, async (req, res) => {
     try {
       console.log(`[FAVORITE] Toggle favorite request received for ID: ${req.params.id}`);
       
-      // Check authentication
       const userId = (req as any).user?.id;
       console.log("[FAVORITE] Auth user ID:", userId);
       
@@ -835,11 +471,9 @@ app.post("/api/snippets", async (req, res) => {
       
       const id = Number(req.params.id);
       
-      // Connect to the database directly
       const client = await pool.connect();
       
       try {
-        // First check if the snippet exists and belongs to the user
         const checkResult = await client.query(
           `SELECT id, userid, isfavorite FROM snippets WHERE id = $1`,
           [id]
@@ -852,16 +486,13 @@ app.post("/api/snippets", async (req, res) => {
         
         const snippet = checkResult.rows[0];
         
-        // Check ownership
         if (snippet.userid !== userId) {
           console.log(`[FAVORITE] Forbidden - snippet ${id} belongs to ${snippet.userid}, not ${userId}`);
           return res.status(403).json({ message: "Forbidden: you don't own this snippet" });
         }
         
-        // Toggle the favorite status
         const newFavoriteStatus = !snippet.isfavorite;
         
-        // Update the database
         const updateResult = await client.query(
           `UPDATE snippets 
            SET isfavorite = $1, updatedat = NOW()
@@ -873,7 +504,6 @@ app.post("/api/snippets", async (req, res) => {
         const updatedSnippet = updateResult.rows[0];
         console.log(`[FAVORITE] Snippet ${id} favorite status toggled to ${newFavoriteStatus}`);
         
-        // Convert column names from database format to camelCase for the response
         const responseSnippet = {
           id: updatedSnippet.id,
           title: updatedSnippet.title,
@@ -891,13 +521,13 @@ app.post("/api/snippets", async (req, res) => {
         };
         
         res.json(responseSnippet);
-      } catch (dbError) {
+      } catch (dbError: any) {
         console.error(`[FAVORITE] Database error for ID ${id}:`, dbError);
         res.status(500).json({ message: "Database error", error: dbError.message });
       } finally {
         client.release();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(`[FAVORITE] POST /api/snippets/${req.params.id}/favorite error:`, err);
       res.status(500).json({ 
         message: "Failed to toggle favorite status", 
@@ -906,9 +536,195 @@ app.post("/api/snippets", async (req, res) => {
     }
   });
 
-  //
+  // IMPORT SNIPPETS (requires authentication)
+  app.post("/api/snippets/import", authMiddleware, async (req, res) => {
+    try {
+      console.log("[IMPORT] Import request received");
+      
+      const userId = (req as any).user?.id;
+      console.log("[IMPORT] Auth user ID:", userId);
+      
+      if (!userId) {
+        console.error("[IMPORT] No user ID found in request");
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      console.log("[IMPORT] Request body structure:", JSON.stringify({
+        snippetsArrayLength: Array.isArray(req.body.snippets) ? req.body.snippets.length : 'not an array',
+        firstSnippetSample: Array.isArray(req.body.snippets) && req.body.snippets.length > 0 
+          ? { title: req.body.snippets[0].title, language: req.body.snippets[0].language } 
+          : 'no snippets'
+      }));
+      
+      const { snippets } = req.body;
+      
+      if (!Array.isArray(snippets)) {
+        console.error("[IMPORT] Invalid input: snippets is not an array");
+        return res.status(400).json({ 
+          message: "Invalid input: snippets must be an array" 
+        });
+      }
+      
+      console.log(`[IMPORT] Processing ${snippets.length} snippets for import`);
+      
+      const importResults = {
+        success: [],
+        failed: []
+      };
+      
+      const client = await pool.connect();
+      
+      for (let i = 0; i < snippets.length; i++) {
+        try {
+          const snippetData = snippets[i];
+          console.log(`[IMPORT] Processing snippet ${i+1}/${snippets.length}:`, 
+            JSON.stringify({
+              title: snippetData.title || 'untitled',
+              language: snippetData.language || 'unknown',
+              codeLength: snippetData.code ? snippetData.code.length : 0,
+              hasDescription: !!snippetData.description,
+              tagsCount: Array.isArray(snippetData.tags) ? snippetData.tags.length : 0
+            })
+          );
+          
+          if (!snippetData.title || !snippetData.code) {
+            console.error(`[IMPORT] Snippet ${i+1} missing required fields:`, 
+              JSON.stringify({ 
+                hasTitle: !!snippetData.title, 
+                hasCode: !!snippetData.code 
+              })
+            );
+            importResults.failed.push({ 
+              index: i, 
+              title: snippetData.title || 'untitled',
+              reason: "Missing required fields" 
+            });
+            continue;
+          }
+          
+          try {
+            const result = await client.query(
+              `INSERT INTO snippets (
+                title, code, language, description, userid, 
+                createdat, updatedat, tags, isfavorite, ispublic
+              ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), $6, $7, $8) 
+              RETURNING id, title`,
+              [
+                snippetData.title, 
+                snippetData.code, 
+                snippetData.language || null,
+                snippetData.description || null,
+                userId,
+                Array.isArray(snippetData.tags) ? snippetData.tags : null,
+                typeof snippetData.isFavorite === 'boolean' ? snippetData.isFavorite : false,
+                typeof snippetData.isPublic === 'boolean' ? snippetData.isPublic : false
+              ]
+            );
+            
+            console.log(`[IMPORT] Snippet ${i+1} created successfully with ID:`, result.rows[0].id);
+            importResults.success.push(result.rows[0]);
+          } catch (dbError: any) {
+            console.error(`[IMPORT] Database error for snippet ${i+1}:`, dbError);
+            importResults.failed.push({ 
+              index: i, 
+              title: snippetData.title,
+              reason: dbError.message 
+            });
+            continue;
+          }
+        } catch (snippetError: any) {
+          console.error(`[IMPORT] Error processing snippet ${i+1}:`, snippetError);
+          importResults.failed.push({ 
+            index: i, 
+            title: snippets[i]?.title || 'unknown',
+            reason: snippetError.message 
+          });
+        }
+      }
+      
+      client.release();
+      
+      console.log("[IMPORT] Import completed. Results:", JSON.stringify({
+        successCount: importResults.success.length,
+        failedCount: importResults.failed.length
+      }));
+      
+      res.status(201).json({ 
+        message: `Successfully imported ${importResults.success.length} snippets. ${importResults.failed.length > 0 ? `Failed to import ${importResults.failed.length} snippets.` : ''}`, 
+        success: importResults.success.map(s => ({ id: s.id, title: s.title })),
+        failed: importResults.failed
+      });
+    } catch (err: any) {
+      console.error("[IMPORT] POST /api/snippets/import error:", err);
+      res.status(500).json({ 
+        message: "Failed to import snippets", 
+        error: err.message 
+      });
+    }
+  }); 
+
+  // TEST IMPORT ENDPOINT (no auth required - for testing only)
+  app.post("/api/test-import", async (req, res) => {
+    console.log("TEST IMPORT ENDPOINT HIT");
+    try {
+      console.log("Request body:", JSON.stringify(req.body));
+      
+      const { snippets } = req.body;
+      
+      if (!Array.isArray(snippets)) {
+        console.error("Invalid input: snippets is not an array");
+        return res.status(400).json({ 
+          message: "Invalid input: snippets must be an array" 
+        });
+      }
+      
+      console.log(`Processing ${snippets.length} snippets for import`);
+      
+      const testSnippet = snippets[0];
+      
+      if (!testSnippet) {
+        return res.status(400).json({ message: "No snippets provided" });
+      }
+      
+      const client = await pool.connect();
+      try {
+        const result = await client.query(
+          `INSERT INTO snippets (title, code, language, userid, createdat, updatedat, tags, isfavorite, ispublic) 
+           VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7) RETURNING id, title`,
+          [
+            testSnippet.title, 
+            testSnippet.code, 
+            testSnippet.language || null,
+            'test-user-id',
+            Array.isArray(testSnippet.tags) ? testSnippet.tags : null,
+            false,
+            false
+          ]
+        );
+        
+        console.log("Direct DB insert result:", result.rows[0]);
+        
+        res.status(201).json({ 
+          message: "Test import successful", 
+          snippet: result.rows[0]
+        });
+      } catch (dbError: any) {
+        console.error("Database error:", dbError);
+        res.status(500).json({ message: "Database error", error: dbError.message });
+      } finally {
+        client.release();
+      }
+    } catch (err: any) {
+      console.error("TEST IMPORT error:", err);
+      res.status(500).json({ 
+        message: "Test import failed", 
+        error: err.message 
+      });
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────
-  //   3) Languages & Tags
+  // ─── 3.3) Languages & Tags ─────────────────────────────────────────
   // ────────────────────────────────────────────────────────────────
   app.get("/api/languages", async (req, res) => {
     try {
@@ -919,7 +735,7 @@ app.post("/api/snippets", async (req, res) => {
         langs = await storage.getLanguages();
       }
       res.json(langs);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[LANGUAGES] GET /api/languages error:", err);
       res.status(500).json({ message: "Failed to fetch languages" });
     }
@@ -934,15 +750,14 @@ app.post("/api/snippets", async (req, res) => {
         tags = await storage.getTags();
       }
       res.json(tags);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[TAGS] GET /api/tags error:", err);
       res.status(500).json({ message: "Failed to fetch tags" });
     }
   });
 
-  //
   // ────────────────────────────────────────────────────────────────
-  //   4) Collections
+  // ─── 3.4) Collections ────────────────────────────────────────────
   // ────────────────────────────────────────────────────────────────
   app.get("/api/collections", async (req, res) => {
     try {
@@ -953,7 +768,7 @@ app.post("/api/snippets", async (req, res) => {
         cols = await storage.getCollections();
       }
       res.json(cols);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[COLLECTIONS] GET /api/collections error:", err);
       res.status(500).json({ message: "Failed to fetch collections" });
     }
@@ -965,7 +780,7 @@ app.post("/api/snippets", async (req, res) => {
       const col = await storage.getCollection(id);
       if (!col) return res.status(404).json({ message: "Not found" });
       res.json(col);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[COLLECTIONS] GET /api/collections/:id error:", err);
       res.status(500).json({ message: "Failed to fetch collection" });
     }
@@ -976,7 +791,7 @@ app.post("/api/snippets", async (req, res) => {
       const id = Number(req.params.id);
       const list = await storage.getCollectionSnippets(id);
       res.json(list);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[COLLECTIONS] GET /api/collections/:id/snippets error:", err);
       res.status(500).json({ message: "Failed to fetch collection snippets" });
     }
@@ -1029,7 +844,7 @@ app.post("/api/snippets", async (req, res) => {
       }
       await storage.deleteCollection(id);
       res.status(204).send();
-    } catch (err) {
+    } catch (err: any) {
       console.error("[COLLECTIONS] DELETE /api/collections/:id error:", err);
       res.status(500).json({ message: "Failed to delete collection" });
     }
@@ -1077,7 +892,7 @@ app.post("/api/snippets", async (req, res) => {
         }
         await storage.removeSnippetFromCollection(collectionId, snippetId);
         res.status(204).send();
-      } catch (err) {
+      } catch (err: any) {
         console.error(
           "[COLLECTION ITEMS] DELETE /api/collections/:collectionId/snippets/:snippetId error:",
           err
@@ -1087,9 +902,8 @@ app.post("/api/snippets", async (req, res) => {
     }
   );
 
-  //
   // ────────────────────────────────────────────────────────────────
-  //   5) Sharing & Publishing
+  // ─── 3.5) Sharing & Publishing ─────────────────────────────────────
   // ────────────────────────────────────────────────────────────────
   app.get("/api/shared/:shareId", async (req, res) => {
     try {
@@ -1099,7 +913,7 @@ app.post("/api/snippets", async (req, res) => {
       if (!snippet.isPublic) return res.status(403).json({ message: "Forbidden" });
       await storage.incrementSnippetViewCount(snippet.id);
       res.json(snippet);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[SHARED] GET /api/shared/:shareId error:", err);
       res.status(500).json({ message: "Failed to fetch shared snippet" });
     }
@@ -1116,7 +930,7 @@ app.post("/api/snippets", async (req, res) => {
       let shareId = existing.shareId;
       if (!shareId) shareId = await storage.generateShareId(id);
       res.json({ shareId });
-    } catch (err) {
+    } catch (err: any) {
       console.error("[SHARE] POST /api/snippets/:id/share error:", err);
       res.status(500).json({ message: "Failed to share snippet" });
     }
@@ -1132,22 +946,21 @@ app.post("/api/snippets", async (req, res) => {
       }
       const updated = await storage.toggleSnippetPublic(id);
       res.json(updated);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[PUBLISH] POST /api/snippets/:id/publish error:", err);
       res.status(500).json({ message: "Failed to publish snippet" });
     }
   });
 
-  //
   // ────────────────────────────────────────────────────────────────
-  //   6) Comments
+  // ─── 3.6) Comments ───────────────────────────────────────────────
   // ────────────────────────────────────────────────────────────────
   app.get("/api/snippets/:snippetId/comments", async (req, res) => {
     try {
       const snippetId = Number(req.params.snippetId);
       const comments = await storage.getCommentsBySnippetId(snippetId);
       res.json(comments);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[COMMENTS] GET /api/snippets/:snippetId/comments error:", err);
       res.status(500).json({ message: "Failed to fetch comments" });
     }
@@ -1183,7 +996,7 @@ app.post("/api/snippets", async (req, res) => {
       }
       const updated = await storage.updateComment(id, req.body);
       res.json(updated);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[COMMENTS] PUT /api/comments/:id error:", err);
       res.status(500).json({ message: "Failed to update comment" });
     }
@@ -1200,15 +1013,19 @@ app.post("/api/snippets", async (req, res) => {
       }
       await storage.deleteComment(id);
       res.status(204).send();
-    } catch (err) {
+    } catch (err: any) {
       console.error("[COMMENTS] DELETE /api/comments/:id error:", err);
       res.status(500).json({ message: "Failed to delete comment" });
     }
   });
 
-  //
+// Catch-All 404 only for /api/* routes
+app.use("/api", (req, res) => {
+  res.status(404).json({ message: "Not found" });
+});
+
   // ────────────────────────────────────────────────────────────────
-  //   Finally, create and return the HTTP server
+  // ─── Finally, create and return the HTTP server ───────────────────
   // ────────────────────────────────────────────────────────────────
   const httpServer = createServer(app);
   return httpServer;

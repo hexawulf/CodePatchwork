@@ -88,7 +88,64 @@ app.use(
 );
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 4. Normalize /api/snippets payload (snake → camel, ISO dates)     */
+/* 4. CRITICAL FIX: JSON-only middleware for ALL API routes          */
+/* ────────────────────────────────────────────────────────────────── */
+app.use('/api', (req, res, next) => {
+  console.log(`[API] ${req.method} ${req.path} - Request received`);
+  
+  // Force Content-Type to application/json for all API responses
+  res.setHeader('Content-Type', 'application/json');
+  
+  // Override Express's default error handling to ensure JSON responses
+  const originalSend = res.send;
+  const originalStatus = res.status;
+  
+  // Ensure res.send always returns JSON for API routes
+  res.send = function(data: any) {
+    // If Express tries to send HTML (like error pages), convert to JSON
+    if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html>'))) {
+      console.log(`[API] 🚨 Converting HTML response to JSON for ${req.method} ${req.path}`);
+      this.setHeader('Content-Type', 'application/json');
+      return originalSend.call(this, JSON.stringify({
+        message: "API endpoint error",
+        error: "An error occurred while processing your request",
+        path: req.path,
+        method: req.method,
+        timestamp: new Date().toISOString()
+      }));
+    }
+    return originalSend.call(this, data);
+  };
+  
+  // Override res.status to ensure chaining works with JSON
+  res.status = function(statusCode: number) {
+    const result = originalStatus.call(this, statusCode);
+    
+    // If someone calls res.status().send() with HTML, intercept it
+    const newSend = result.send;
+    result.send = function(data: any) {
+      if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html>'))) {
+        console.log(`[API] 🚨 Converting status ${statusCode} HTML to JSON for ${req.method} ${req.path}`);
+        this.setHeader('Content-Type', 'application/json');
+        return originalSend.call(this, JSON.stringify({
+          message: "API Error",
+          error: `HTTP ${statusCode} Error`,
+          path: req.path,
+          method: req.method,
+          timestamp: new Date().toISOString()
+        }));
+      }
+      return newSend.call(this, data);
+    };
+    
+    return result;
+  };
+  
+  next();
+});
+
+/* ────────────────────────────────────────────────────────────────── */
+/* 5. Normalize /api/snippets payload (snake → camel, ISO dates)     */
 /* ────────────────────────────────────────────────────────────────── */
 app.use("/api/snippets", (_req, res, next) => {
   type Row = Record<string, unknown>;
@@ -117,7 +174,7 @@ app.use("/api/snippets", (_req, res, next) => {
 });
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 5. Simple API request logger                                      */
+/* 6. Simple API request logger                                      */
 /* ────────────────────────────────────────────────────────────────── */
 app.use((req, res, next) => {
   const t0 = Date.now();
@@ -143,21 +200,66 @@ app.use((req, res, next) => {
 });
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 6. Route registration & global error handler                      */
+/* 7. Route registration                                              */
 /* ────────────────────────────────────────────────────────────────── */
 (async () => {
+  console.log("🔧 Starting route registration...");
   const server = await registerRoutes(app);
-
-  // global error handler
-  app.use(
-    (err: any, _req: Request, res: Response, _next: NextFunction) => {
-      console.error("[💥 ERROR]", err.stack || err);
-      res.status(err.status || 500).json({ message: err.message || "Error" });
-    }
-  );
+  console.log("✅ Route registration complete");
 
   /* ──────────────────────────────────────────────────────────────── */
-  /* 7. Vite in dev or static in prod                                */
+  /* 8. 404 Handler for unmatched API routes - MUST BE BEFORE GLOBAL  */
+  /* ──────────────────────────────────────────────────────────────── */
+  app.use('/api/*', (req, res) => {
+    console.log(`[404] API route not found: ${req.method} ${req.path}`);
+    res.status(404).json({ 
+      message: "API endpoint not found",
+      path: req.path,
+      method: req.method,
+      timestamp: new Date().toISOString(),
+      availableEndpoints: [
+        "GET /api/test",
+        "GET /api/snippets",
+        "GET /api/snippets/:id",
+        "POST /api/snippets",
+        "PUT /api/snippets/:id", 
+        "DELETE /api/snippets/:id",
+        "POST /api/snippets/:id/favorite",
+        "GET /api/languages",
+        "GET /api/tags",
+        "POST /api/auth/user",
+        "GET /api/auth/me"
+      ]
+    });
+  });
+
+  /* ──────────────────────────────────────────────────────────────── */
+  /* 9. Enhanced global error handler - MUST BE AFTER 404 HANDLER     */
+  /* ──────────────────────────────────────────────────────────────── */
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error(`[💥 GLOBAL ERROR] ${req.method} ${req.path}:`, err.stack || err);
+    
+    // Ensure we don't send if headers already sent
+    if (!res.headersSent) {
+      // Always return JSON for API routes
+      if (req.path.startsWith('/api/')) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(err.status || 500).json({
+          message: err.message || "Internal server error",
+          path: req.path,
+          method: req.method,
+          timestamp: new Date().toISOString(),
+          error: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.stack
+        });
+      } else {
+        // For non-API routes, use your original behavior
+        res.status(err.status || 500).json({ message: err.message || "Error" });
+      }
+    }
+  });
+
+  /* ──────────────────────────────────────────────────────────────── */
+  /* 10. Vite in dev or static in prod                               */
   /* ──────────────────────────────────────────────────────────────── */
   if (app.get("env") === "development") {
     await setupVite(app, server);
@@ -166,11 +268,50 @@ app.use((req, res, next) => {
   }
 
   /* ──────────────────────────────────────────────────────────────── */
-  /* 8. Start HTTP server                                            */
+  /* 11. Start HTTP server                                           */
   /* ──────────────────────────────────────────────────────────────── */
   const port = Number(process.env.PORT) || 3001;
   server.listen(
     { host: "0.0.0.0", port, reusePort: true },
-    () => log(`🚀 Serving on port ${port}`)
+    () => {
+      log(`🚀 Serving on port ${port}`);
+      log(`📡 API available at http://localhost:${port}/api/`);
+      log(`🧪 Test API at http://localhost:${port}/api/test`);
+      console.log("---");
+      console.log("🔧 API Endpoints registered:");
+      console.log("  GET    /api/test");
+      console.log("  GET    /api/snippets"); 
+      console.log("  GET    /api/snippets/:id");
+      console.log("  POST   /api/snippets");
+      console.log("  PUT    /api/snippets/:id");
+      console.log("  DELETE /api/snippets/:id");
+      console.log("  POST   /api/snippets/:id/favorite");
+      console.log("  GET    /api/languages");
+      console.log("  GET    /api/tags");
+      console.log("  POST   /api/auth/user");
+      console.log("  GET    /api/auth/me");
+      console.log("---");
+    }
   );
-})();
+
+  // Handle process termination gracefully
+  process.on('SIGTERM', () => {
+    console.log('🛑 SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    console.log('🛑 SIGINT received, shutting down gracefully');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
+  });
+
+})().catch((error) => {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
+});

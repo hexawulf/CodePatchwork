@@ -3,56 +3,178 @@
 @tailwind utilities;
 
 :root {
-      --background: 0 0% 100%;
---foreground: 20 14.3% 4.1%;
---muted: 60 4.8% 95.9%;
---muted-foreground: 25 5.3% 44.7%;
---popover: 0 0% 100%;
---popover-foreground: 20 14.3% 4.1%;
---card: 0 0% 100%;
---card-foreground: 20 14.3% 4.1%;
---border: 20 5.9% 90%;
---input: 20 5.9% 90%;
---primary: 207 90% 54%;
---primary-foreground: 211 100% 99%;
---secondary: 60 4.8% 95.9%;
---secondary-foreground: 24 9.8% 10%;
---accent: 60 4.8% 95.9%;
---accent-foreground: 24 9.8% 10%;
---destructive: 0 84.2% 60.2%;
---destructive-foreground: 60 9.1% 97.8%;
---ring: 20 14.3% 4.1%;
---radius: 0.5rem;
-  }
-  .dark {
-      --background: 240 10% 3.9%;
---foreground: 0 0% 98%;
---muted: 240 3.7% 15.9%;
---muted-foreground: 240 5% 64.9%;
---popover: 240 10% 3.9%;
---popover-foreground: 0 0% 98%;
---card: 240 10% 3.9%;
---card-foreground: 0 0% 98%;
---border: 240 3.7% 15.9%;
---input: 240 3.7% 15.9%;
---primary: 207 90% 54%;
---primary-foreground: 211 100% 99%;
---secondary: 240 3.7% 15.9%;
---secondary-foreground: 0 0% 98%;
---accent: 240 3.7% 15.9%;
---accent-foreground: 0 0% 98%;
---destructive: 0 62.8% 30.6%;
---destructive-foreground: 0 0% 98%;
---ring: 240 4.9% 83.9%;
---radius: 0.5rem;
-  }
+  --background: 0 0% 100%;
+  --foreground: 20 14.3% 4.1%;
+  --muted: 60 4.8% 95.9%;
+  --muted-foreground: 25 5.3% 44.7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 14.3% 4.1%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 14.3% 4.1%;
+  --border: 20 5.9% 90%;
+  --input: 20 5.9% 90%;
+  --primary: 207 90% 54%;
+  --primary-foreground: 211 100% 99%;
+  --secondary: 60 4.8% 95.9%;
+  --secondary-foreground: 24 9.8% 10%;
+  --accent: 60 4.8% 95.9%;
+  --accent-foreground: 24 9.8% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 60 9.1% 97.8%;
+  --ring: 20 14.3% 4.1%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --primary: 207 90% 54%;
+  --primary-foreground: 211 100% 99%;
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 240 4.9% 83.9%;
+  --radius: 0.5rem;
+}
 
 @layer base {
   * {
     @apply border-border;
   }
 
-  body {
+  /* Enhanced body styles with layout fixes */
+  html, body {
     @apply font-sans antialiased bg-background text-foreground;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* Fix for main application container to prevent bottom white space */
+  #root {
+    min-height: 100vh;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@layer components {
+  /* Layout fixes for common containers */
+  .app-container,
+  .main-container {
+    @apply min-h-screen flex flex-col;
+  }
+
+  /* Content area should expand to fill remaining space */
+  .content-area,
+  .snippets-container,
+  .main-content {
+    @apply flex-1 overflow-y-auto;
+  }
+
+  /* Grid container for snippets - prevent overflow issues */
+  .snippets-grid {
+    @apply grid gap-4 p-4;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    min-height: 0; /* Important for grid overflow */
+  }
+
+  /* Individual snippet cards */
+  .snippet-card {
+    @apply h-fit overflow-hidden;
+    max-height: 400px; /* Prevent cards from being too tall */
+  }
+
+  /* Header/Navigation fixed positioning if needed */
+  .app-header {
+    @apply flex-shrink-0;
+  }
+
+  /* Footer positioning */
+  .app-footer {
+    @apply mt-auto flex-shrink-0;
+  }
+
+  /* Hide any unwanted bottom spacers */
+  .bottom-spacer {
+    display: none !important;
+  }
+}
+
+@layer utilities {
+  /* Debug utilities - add these classes temporarily to identify layout issues */
+  .debug-layout * {
+    outline: 1px solid red !important;
+  }
+
+  .debug-layout *:nth-child(even) {
+    outline-color: blue !important;
+  }
+
+  /* Utility to force full height */
+  .full-height {
+    height: 100vh;
+    min-height: 100vh;
+  }
+
+  /* Utility to prevent bottom overflow */
+  .no-bottom-space {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Utility for proper flex containers */
+  .flex-fill {
+    @apply flex-1 min-h-0;
+  }
+}
+
+/* Specific fixes for common React app patterns */
+.react-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fix for any absolute/fixed positioned elements at bottom */
+.floating-elements {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+/* Ensure proper grid behavior in various screen sizes */
+@media (max-width: 768px) {
+  .snippets-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .snippets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+@media (min-width: 1025px) {
+  .snippets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   }
 }
