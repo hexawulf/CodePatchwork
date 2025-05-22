@@ -1,8 +1,58 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
- 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+
+/**
+ * Safely converts any className value to a string
+ * Handles objects, arrays, and other non-string values
+ */
+export function safeClassName(className: any): string {
+  if (typeof className === 'string') {
+    return className;
+  }
+  
+  if (className === null || className === undefined) {
+    return '';
+  }
+  
+  // Handle SVGAnimatedString (the main culprit)
+  if (className && typeof className === 'object' && 'baseVal' in className) {
+    return className.baseVal || '';
+  }
+  
+  // Handle arrays
+  if (Array.isArray(className)) {
+    return className.map(safeClassName).filter(Boolean).join(' ');
+  }
+  
+  // Handle objects (CSS modules, styled-components)
+  if (typeof className === 'object') {
+    return Object.keys(className)
+      .filter(key => className[key])
+      .join(' ');
+  }
+  
+  // Handle functions, numbers, booleans
+  if (typeof className === 'function') {
+    return '';
+  }
+  
+  return String(className);
+}
+
+/**
+ * Enhanced cn function that safely handles all className types
+ * This prevents the "className.includes is not a function" error
+ */
+export function cn(...inputs: ClassValue[]): string {
+  // First, make all inputs safe
+  const safeInputs = inputs.map(input => {
+    if (typeof input === 'string' || typeof input === 'undefined' || input === null) {
+      return input;
+    }
+    return safeClassName(input);
+  });
+  
+  return twMerge(clsx(safeInputs));
 }
 
 export function debounce<T extends (...args: any[]) => any>(

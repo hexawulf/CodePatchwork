@@ -37,8 +37,8 @@ export default function Layout({ children }: LayoutProps) {
         {/* Header */}
         <Header toggleMobileMenu={toggleMobileMenu} />
         
-        {/* Main Content Area */}
-        <main className="flex-grow overflow-y-auto p-4 bg-slate-50 dark:bg-gray-800">
+        {/* Main Content Area - FIXED */}
+        <main className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-gray-800 min-h-0">
           {children}
         </main>
       </div>
