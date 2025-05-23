@@ -16,7 +16,6 @@ import CollectionDetail from "@/pages/CollectionDetail";
 import Tags from "@/pages/Tags";
 import Settings from "@/pages/Settings";
 import SharedSnippet from "@/pages/SharedSnippet";
-import { DebugEnv } from "./components/Debug";
 
 function Router() {
   return (
@@ -138,7 +137,6 @@ export default function App() {
           <CollectionProvider>
             <TooltipProvider>
               <Router />
-              <DebugEnv />
               {showDebug && <AuthDebug user={user} loading={loading} />}
             </TooltipProvider>
           </CollectionProvider>

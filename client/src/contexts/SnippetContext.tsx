@@ -91,7 +91,7 @@ export function SnippetProvider({ children }: { children: ReactNode }) {
   // Delete snippet mutation
   const deleteSnippetMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/snippets/${id}`);
+      await apiRequest("DELETE", `/api/snippets/${id}`, undefined, { expectJson: false });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
