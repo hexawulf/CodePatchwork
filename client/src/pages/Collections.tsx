@@ -17,17 +17,11 @@ export default function Collections() {
   const [collectionToDelete, setCollectionToDelete] = useState<Collection | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [collectionToEdit, setCollectionToEdit] = useState<Collection | null>(null);
   const [, navigate] = useLocation();
   
   const { 
-    deleteCollection, 
-    openEditModal,
-    collectionToEdit,
-    isCreateModalOpen,
-    openCreateModal,
-    closeCreateModal,
-    isEditModalOpen,
-    closeEditModal,
+    deleteCollection,
     setActiveCollectionId
   } = useCollectionContext();
   
@@ -42,13 +36,28 @@ export default function Collections() {
 
   // Handle open create collection modal
   const handleOpenCreateModal = () => {
+    console.log('🚀 Opening create collection dialog');
     setShowCreateDialog(true);
+  };
+
+  // Handle close create collection modal
+  const handleCloseCreateModal = () => {
+    console.log('🚀 Closing create collection dialog');
+    setShowCreateDialog(false);
   };
 
   // Handle edit collection
   const handleEditCollection = (collection: Collection) => {
-    openEditModal(collection);
+    console.log('🚀 Opening edit collection dialog for:', collection.name);
+    setCollectionToEdit(collection);
     setShowEditDialog(true);
+  };
+
+  // Handle close edit collection modal
+  const handleCloseEditModal = () => {
+    console.log('🚀 Closing edit collection dialog');
+    setShowEditDialog(false);
+    setCollectionToEdit(null);
   };
 
   // Handle delete collection
@@ -231,16 +240,16 @@ export default function Collections() {
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Create Collection Dialog */}
+      {/* Create Collection Dialog - FIXED: Use local state instead of context */}
       <CollectionDialog 
         open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+        onOpenChange={handleCloseCreateModal}
       />
       
-      {/* Edit Collection Dialog */}
+      {/* Edit Collection Dialog - FIXED: Use local state instead of context */}
       <CollectionDialog 
         open={showEditDialog}
-        onOpenChange={setShowEditDialog}
+        onOpenChange={handleCloseEditModal}
         collectionToEdit={collectionToEdit}
         isEditMode={true}
       />
