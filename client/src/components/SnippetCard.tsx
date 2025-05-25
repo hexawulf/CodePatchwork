@@ -122,24 +122,13 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
     }
   };
   
-  // Function to handle sharing
+  // Function to handle sharing - FIXED: Now uses apiRequest
   const handleShare = async () => {
     try {
       setIsSharing(true);
       
-      // Direct fetch call with proper error handling
-      const response = await fetch(`/api/snippets/${snippet.id}/share`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
+      // Use apiRequest instead of direct fetch to include authentication
+      const data = await apiRequest('POST', `/api/snippets/${snippet.id}/share`);
       
       if (data && data.shareId) {
         // Create the share URL and open the dialog
@@ -164,24 +153,13 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
     }
   };
   
-  // Function to toggle public access
+  // Function to toggle public access - FIXED: Now uses apiRequest
   const handleTogglePublic = async () => {
     try {
       setIsTogglePublic(true);
       
-      // Direct fetch call with proper error handling
-      const response = await fetch(`/api/snippets/${snippet.id}/publish`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-      
-      const updatedSnippet = await response.json();
+      // Use apiRequest instead of direct fetch to include authentication
+      const updatedSnippet = await apiRequest('POST', `/api/snippets/${snippet.id}/publish`);
       
       toast({
         title: updatedSnippet.isPublic ? "Snippet published" : "Snippet unpublished",

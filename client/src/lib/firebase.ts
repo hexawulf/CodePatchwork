@@ -138,8 +138,31 @@ export const checkFirebaseAuth = async () => {
   return { user: null };
 };
 
-// Add a global reference for debugging from the console
+// 9️⃣ Expose Firebase objects globally for console debugging
 if (typeof window !== 'undefined') {
   (window as any).__checkFirebaseAuth = checkFirebaseAuth;
-  console.log("[Firebase] Added global debug function: __checkFirebaseAuth");
+  (window as any).__firebaseApp = app;
+  (window as any).__firebaseAuth = auth;
+  (window as any).__googleProvider = googleProvider;
+  
+  // Also expose auth state checker
+  (window as any).__getCurrentUser = () => {
+    return auth.currentUser;
+  };
+  
+  // And a simple auth status checker
+  (window as any).__getAuthStatus = () => {
+    const user = auth.currentUser;
+    return {
+      isSignedIn: !!user,
+      user: user ? {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName
+      } : null,
+      authReady: true
+    };
+  };
+  
+  console.log("[Firebase] Added global debug functions: __checkFirebaseAuth, __firebaseApp, __firebaseAuth, __getCurrentUser, __getAuthStatus");
 }

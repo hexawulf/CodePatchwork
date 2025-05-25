@@ -97,24 +97,17 @@ export default function AddSnippetDialog({
       
       // Determine if we're creating or updating
       const isEditing = isEditMode && snippetToEdit;
-      const API_URL = window.location.origin + (isEditing 
+      const API_URL = isEditing 
         ? `/api/snippets/${snippetToEdit.id}` 
-        : '/api/snippets');
+        : '/api/snippets';
         
-      const res = await fetch(API_URL, {
-        method: isEditing ? 'PUT' : 'POST',
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(snippet),
-        credentials: "include"
-      });
+      // FIXED: Use apiRequest instead of direct fetch to include authentication
+      const result = await apiRequest(
+        isEditing ? 'PUT' : 'POST',
+        API_URL,
+        snippet
+      );
       
-      if (!res.ok) {
-        throw new Error(`HTTP error ${res.status}`);
-      }
-      
-      const result = await res.json();
       console.log(isEditing ? "Snippet updated successfully:" : "Snippet created successfully:", result);
       
       toast({
@@ -135,7 +128,7 @@ export default function AddSnippetDialog({
       console.error("Error creating snippet:", error);
       toast({
         title: "Error",
-        description: "Failed to create snippet. Please try again.",
+        description: `Failed to ${isEditMode ? 'update' : 'create'} snippet. Please try again.`,
         variant: "destructive",
       });
     } finally {

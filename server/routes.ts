@@ -49,6 +49,34 @@ export const authMiddleware: RequestHandler = async (req, res, next) => {
 
 /** ─── 3) Register all routes ─────────────────────────────────────────────── */
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // ─── 3.0) Health Check Endpoint ──────────────────────────────────
+  app.get("/api/health", async (req: Request, res: Response) => {
+    try {
+      // Test database connection
+      const client = await pool.connect();
+      const dbResult = await client.query("SELECT NOW() as current_time");
+      client.release();
+      
+      res.json({
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        database: "connected",
+        dbTime: dbResult.rows[0].current_time,
+        server: "running"
+      });
+    } catch (error: any) {
+      console.error("Health check failed:", error);
+      res.status(503).json({
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        database: "disconnected",
+        error: error.message,
+        server: "running"
+      });
+    }
+  });
+
   // ─── 3.1) Firebase Auth endpoints ──────────────────────────────────
 
   app.post("/api/auth/user", async (req: Request, res: Response) => {
@@ -1019,10 +1047,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-// Catch-All 404 only for /api/* routes
-app.use("/api", (req, res) => {
-  res.status(404).json({ message: "Not found" });
-});
+  // Catch-All 404 only for /api/* routes
+  app.use("/api", (req, res) => {
+    res.status(404).json({ message: "Not found" });
+  });
 
   // ────────────────────────────────────────────────────────────────
   // ─── Finally, create and return the HTTP server ───────────────────
