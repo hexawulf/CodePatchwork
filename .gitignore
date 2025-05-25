@@ -70,3 +70,4 @@ firebase-adminsdk.json
 drizzle-studio.db
 codepatchwork-c3d85-firebase-adminsdk-*.json
 codepatchwork-c3d85-firebase-adminsdk-*.json
+*.backup

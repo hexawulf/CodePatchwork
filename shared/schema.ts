@@ -19,7 +19,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-// Snippet schema
+// Snippet schema - FIXED to match database exactly
 export const snippets = pgTable("snippets", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -27,13 +27,13 @@ export const snippets = pgTable("snippets", {
   code: text("code").notNull(),
   language: text("language").notNull(),
   tags: text("tags").array(),
-  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  viewCount: integer("view_count").default(0),
-  isFavorite: boolean("is_favorite").default(false),
-  shareId: text("share_id").unique(), // Unique identifier for sharing
-  isPublic: boolean("is_public").default(false), // Controls if the snippet is publicly accessible
+  userId: text("userid"), // FIXED: Match database column "userid"
+  createdAt: timestamp("createdat").defaultNow().notNull(), // FIXED: Match database column "createdat"
+  updatedAt: timestamp("updatedat").defaultNow().notNull(), // FIXED: Match database column "updatedat"
+  viewCount: integer("viewcount").default(0), // FIXED: Match database column "viewcount"
+  isFavorite: boolean("isfavorite").default(false), // FIXED: Match database column "isfavorite"
+  shareId: text("shareid").unique(), // FIXED: Match database column "shareid"
+  isPublic: boolean("ispublic").default(false), // FIXED: Match database column "ispublic"
 });
 
 export const insertSnippetSchema = createInsertSchema(snippets).omit({
@@ -48,14 +48,14 @@ export const insertSnippetSchema = createInsertSchema(snippets).omit({
 export type InsertSnippet = z.infer<typeof insertSnippetSchema>;
 export type Snippet = typeof snippets.$inferSelect;
 
-// Collections schema
+// Collections schema - FIXED to match database exactly
 export const collections = pgTable("collections", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  userId: text("userid"), // FIXED: Match database column "userid"
+  createdAt: timestamp("createdat").defaultNow().notNull(), // FIXED: Match database column "createdat"
+  updatedAt: timestamp("updatedat").defaultNow().notNull(), // FIXED: Match database column "updatedat"
 });
 
 export const insertCollectionSchema = createInsertSchema(collections).omit({
@@ -83,16 +83,14 @@ export const insertCollectionItemSchema = createInsertSchema(collectionItems).om
 export type InsertCollectionItem = z.infer<typeof insertCollectionItemSchema>;
 export type CollectionItem = typeof collectionItems.$inferSelect;
 
-// Comments schema
+// Comments schema - FIXED to match actual database structure
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
-  snippetId: integer("snippet_id").notNull(),
+  snippetId: integer("snippetid").notNull(), // FIXED: Match database column "snippetid"
   content: text("content").notNull(),
-  authorName: text("author_name").notNull(), // For guest comments without authentication
-  authorEmail: text("author_email"), // Optional email for notifications
-  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  userId: text("userid"), // FIXED: Match database column "userid"
+  createdAt: timestamp("createdat").defaultNow().notNull(), // FIXED: Match database column "createdat"
+  updatedAt: timestamp("updatedat").defaultNow().notNull(), // FIXED: Match database column "updatedat"
 });
 
 export const insertCommentSchema = createInsertSchema(comments).omit({

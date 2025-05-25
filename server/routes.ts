@@ -1,4 +1,4 @@
-// server/routes.ts - FIXED VERSION
+// server/routes.ts - FIXED VERSION WITH DEBUG COLLECTION POST
 import type { Express, Request, Response, NextFunction, RequestHandler } from "express";
 import { createServer, type Server }                from "http";
 import admin                                        from "firebase-admin";
@@ -825,20 +825,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG COLLECTION POST ENDPOINT
   app.post("/api/collections", authMiddleware, async (req, res) => {
     try {
+      console.log("🔥 COLLECTION CREATE: Request received");
+      console.log("🔥 COLLECTION CREATE: User ID:", (req as any).user?.id);
+      console.log("🔥 COLLECTION CREATE: Request body:", JSON.stringify(req.body));
+      
       const dto = insertCollectionSchema.parse({
         ...req.body,
         userId: (req as any).user.id
       });
+      
+      console.log("🔥 COLLECTION CREATE: Parsed DTO:", JSON.stringify(dto));
+      console.log("🔥 COLLECTION CREATE: About to call storage.createCollection");
+      
       const created = await storage.createCollection(dto);
+      
+      console.log("🔥 COLLECTION CREATE: Success! Created collection:", JSON.stringify(created));
       res.status(201).json(created);
     } catch (err: any) {
+      console.error("🔥 COLLECTION CREATE: Caught error:", err);
+      console.error("🔥 COLLECTION CREATE: Error name:", err.name);
+      console.error("🔥 COLLECTION CREATE: Error message:", err.message);
+      console.error("🔥 COLLECTION CREATE: Error stack:", err.stack);
+      
       if (err instanceof z.ZodError) {
+        console.error("🔥 COLLECTION CREATE: Zod validation error:", err.errors);
         return res.status(400).json({ message: "Invalid data", errors: err.errors });
       }
+      
       console.error("[COLLECTIONS] POST /api/collections error:", err);
-      res.status(500).json({ message: "Failed to create collection" });
+      res.status(500).json({ 
+        message: "Failed to create collection", 
+        error: err.message,
+        details: err.stack 
+      });
     }
   });
 
