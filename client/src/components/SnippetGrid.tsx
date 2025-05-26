@@ -9,9 +9,10 @@ interface SnippetGridProps {
   isLoading: boolean;
   error: Error | null;
   viewMode: "grid" | "list";
+  isPublicView?: boolean;
 }
 
-export default function SnippetGrid({ snippets, isLoading, error, viewMode }: SnippetGridProps) {
+export default function SnippetGrid({ snippets, isLoading, error, viewMode, isPublicView = false }: SnippetGridProps) {
   if (error) {
     return (
       <Alert variant="destructive">
@@ -49,9 +50,13 @@ export default function SnippetGrid({ snippets, isLoading, error, viewMode }: Sn
   if (snippets.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg p-8 text-center">
-        <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">No snippets found</h3>
+        <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+          {isPublicView ? "No Public Snippets Found" : "No Snippets Found"}
+        </h3>
         <p className="text-slate-500 dark:text-slate-400">
-          Try adjusting your search or filters, or create a new snippet.
+          {isPublicView 
+            ? "Try adjusting your search or filters, or check back later!" 
+            : "Try adjusting your search or filters, or create a new snippet."}
         </p>
       </div>
     );
@@ -60,7 +65,7 @@ export default function SnippetGrid({ snippets, isLoading, error, viewMode }: Sn
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${viewMode === "list" ? "!grid-cols-1" : ""}`}>
       {snippets.map((snippet) => (
-        <SnippetCard key={snippet.id} snippet={snippet} viewMode={viewMode} />
+        <SnippetCard key={snippet.id} snippet={snippet} viewMode={viewMode} isPublicView={isPublicView} />
       ))}
     </div>
   );

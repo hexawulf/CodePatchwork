@@ -9,7 +9,8 @@ import { SnippetProvider } from "@/contexts/SnippetContext";
 import { CollectionProvider } from "@/contexts/CollectionContext";
 import { useAuthContext } from "@/contexts/AuthContext";
 import NotFound from "@/pages/not-found";
-import Home from "@/pages/Home";
+import Home from "@/pages/Home"; // This is the authenticated dashboard
+import PublicHome from '@/pages/PublicHome';
 import Snippets from "@/pages/Snippets";
 import Collections from "@/pages/Collections";
 import CollectionDetail from "@/pages/CollectionDetail";
@@ -17,10 +18,11 @@ import Tags from "@/pages/Tags";
 import Settings from "@/pages/Settings";
 import SharedSnippet from "@/pages/SharedSnippet";
 
-function Router() {
+// Renamed from Router to AuthenticatedRouter
+function AuthenticatedRouter() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={Home} /> {/* Authenticated home/dashboard */}
       <Route path="/snippets" component={Snippets} />
       <Route path="/collections" component={Collections} />
       <Route path="/collections/:id" component={CollectionDetail} />
@@ -28,6 +30,17 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/shared/:shareId" component={SharedSnippet} />
       <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function PublicRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={PublicHome} />
+      <Route path="/shared/:shareId" component={SharedSnippet} />
+      {/* For non-matched routes, redirect to PublicHome */}
+      <Route component={PublicHome} />
     </Switch>
   );
 }
@@ -48,7 +61,7 @@ function AuthDebug({ user, loading }: { user: any, loading: boolean }) {
 }
 
 export default function App() {
-  const { user, loading, signIn } = useAuthContext();
+  const { user, loading } = useAuthContext(); // Removed signIn from here as it's not used directly for button anymore
   const [showDebug, setShowDebug] = useState(false);
 
   // Add explicit debugging to track auth state
@@ -105,38 +118,16 @@ export default function App() {
     );
   }
 
-  // 2) Not signed in → show Google button
-  if (!user) {
-    console.log("[App] No user detected, showing login button");
-    return (
-      <div className="h-screen flex flex-col items-center justify-center">
-        <div className="mb-4">
-          <h1 className="text-xl font-bold mb-2">CodePatchwork</h1>
-          <p>Please sign in to access your snippets</p>
-        </div>
-        <button
-          onClick={() => {
-            console.log("[App] Sign in button clicked");
-            signIn();
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Sign in with Google
-        </button>
-        {showDebug && <AuthDebug user={user} loading={loading} />}
-      </div>
-    );
-  }
-
-  // 3) Signed in → render the full app
-  console.log("[App] User authenticated, rendering full app:", user);
+  // 2) Routing logic based on authentication state
+  // PublicHome will now handle the sign-in prompt.
+  console.log(`[App] Rendering routers. User: ${user ? user.id : 'null'}, Loading: ${loading}`);
   return (
     <ThemeProvider>
       <CodeThemeProvider>
-        <SnippetProvider>
-          <CollectionProvider>
+        <SnippetProvider> {/* SnippetProvider might be needed by SharedSnippet too */}
+          <CollectionProvider> {/* CollectionProvider might be needed by SharedSnippet too */}
             <TooltipProvider>
-              <Router />
+              {user ? <AuthenticatedRouter /> : <PublicRouter />}
               {showDebug && <AuthDebug user={user} loading={loading} />}
             </TooltipProvider>
           </CollectionProvider>
