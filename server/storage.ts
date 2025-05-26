@@ -21,6 +21,7 @@ export interface IStorage {
     language?: string | string[];
     tag?: string | string[];
     favorites?: boolean;
+    isPublic?: boolean;
   }): Promise<Snippet[]>;
   getSnippet(id: number): Promise<Snippet | undefined>;
   createSnippet(snippet: InsertSnippet): Promise<Snippet>;
@@ -136,7 +137,8 @@ function useLocalStorage<T>(
         tags: ["react", "hooks", "typescript"],
         userId: null,
         isFavorite: false,
-        viewCount: 12
+        viewCount: 12,
+        isPublic: true
       },
       {
         title: "Python Decorator for Timing",
@@ -169,7 +171,8 @@ waste_some_time(100)`,
         tags: ["python", "decorators", "performance"],
         userId: null,
         isFavorite: false,
-        viewCount: 24
+        viewCount: 24,
+        isPublic: false
       },
       {
         title: "CSS Grid Layout Template",
@@ -215,7 +218,8 @@ waste_some_time(100)`,
         tags: ["css", "grid", "responsive"],
         userId: null,
         isFavorite: true,
-        viewCount: 41
+        viewCount: 41,
+        isPublic: true
       },
       {
         title: "JavaScript Array Methods Cheatsheet",
@@ -255,7 +259,8 @@ string.split(separator);   // Split string into array`,
         tags: ["javascript", "arrays", "cheatsheet"],
         userId: null,
         isFavorite: true,
-        viewCount: 137
+        viewCount: 137,
+        isPublic: false
       },
       {
         title: "Tailwind Dark Mode Toggle",
@@ -304,7 +309,8 @@ const DarkModeToggle = () => {
         tags: ["react", "tailwind", "darkmode"],
         userId: null,
         isFavorite: false,
-        viewCount: 52
+        viewCount: 52,
+        isPublic: true
       },
       {
         title: "Go Error Handling Pattern",
@@ -363,7 +369,8 @@ func main() {
         tags: ["go", "error-handling", "best-practices"],
         userId: null,
         isFavorite: false,
-        viewCount: 18
+        viewCount: 18,
+        isPublic: false
       }
     ];
 
@@ -438,6 +445,7 @@ func main() {
     language?: string | string[];
     tag?: string | string[];
     favorites?: boolean;
+    isPublic?: boolean;
   }): Promise<Snippet[]> {
     let snippets = Array.from(this.snippets.values());
     
@@ -490,6 +498,11 @@ func main() {
           (s.code && s.code.toLowerCase().includes(searchTerm))
         );
       }
+
+      // Filter by public status
+      if (filters.isPublic !== undefined) {
+        snippets = snippets.filter(s => s.isPublic === filters.isPublic);
+      }
     }
     
     // Sort by most recently updated
@@ -514,7 +527,9 @@ func main() {
       createdAt: now,
       updatedAt: now,
       viewCount: snippet.viewCount || 0,
-      isFavorite: snippet.isFavorite || false
+      isFavorite: snippet.isFavorite || false,
+      isPublic: snippet.isPublic || false, // Ensure isPublic is set, defaulting to false
+      shareId: snippet.shareId || null
     };
     
     this.snippets.set(id, newSnippet);
@@ -859,6 +874,7 @@ export class DatabaseStorage implements IStorage {
     language?: string | string[];
     tag?: string | string[];
     favorites?: boolean;
+    isPublic?: boolean;
   }): Promise<Snippet[]> {
     const { db } = await import('./db');
     let query = db.select().from(snippets);
@@ -910,6 +926,11 @@ export class DatabaseStorage implements IStorage {
       // Handle favorites filter
       if (filters.favorites) {
         query = query.where(eq(snippets.isFavorite, true));
+      }
+
+      // Filter by public status
+      if (filters.isPublic !== undefined) {
+        query = query.where(eq(snippets.isPublic, filters.isPublic));
       }
     }
     

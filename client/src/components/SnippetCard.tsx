@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import CodeBlock from "./CodeBlock";
 import { useSnippetContext } from "@/contexts/SnippetContext";
+import { useAuthContext } from '@/contexts/AuthContext';
 import AddSnippetDialog from "./AddSnippetDialog";
 import AddToCollectionDialog from "./AddToCollectionDialog";
 import ShareLinkDialog from "./ShareLinkDialog";
@@ -33,11 +34,13 @@ import {
 interface SnippetCardProps {
   snippet: Snippet;
   viewMode: "grid" | "list";
+  isPublicView?: boolean;
 }
 
-export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
+export default function SnippetCard({ snippet, viewMode, isPublicView = false }: SnippetCardProps) {
   // Use the context for all operations
   const { toggleFavorite, deleteSnippet } = useSnippetContext();
+  const { user } = useAuthContext();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -47,6 +50,8 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [isTogglePublic, setIsTogglePublic] = useState(false);
+
+  const isOwner = user && snippet.userId && user.id === snippet.userId;
   
   // Function to get language color
   const getLanguageColor = (language?: string) => {
@@ -188,69 +193,82 @@ export default function SnippetCard({ snippet, viewMode }: SnippetCardProps) {
       viewMode === "list" && "flex flex-col md:flex-row"
     )}>
       <div className={cn(
-        "p-4 pb-3",
+        "p-4 pb-3 relative", // Added relative for badge positioning
         viewMode === "list" && "md:w-1/3"
       )}>
-        <div className="flex justify-between items-start mb-2">
+        {snippet.isPublic && (
+          <span className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full z-10">
+            Public
+          </span>
+        )}
+        <div className="flex justify-between items-start mb-2 pt-4"> {/* Added pt-4 to avoid overlap with badge */}
           <h3 className="font-medium text-slate-900 dark:text-white">{snippet.title}</h3>
           <div className="flex space-x-1">
-            <button 
-              type="button" 
-              onClick={handleFavoriteToggle}
-              className={cn(
-                snippet.isFavorite 
-                  ? "text-amber-400 hover:text-amber-500" 
-                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              )}
-              aria-label={snippet.isFavorite ? "Remove from favorites" : "Add to favorites"}
-            >
-              <Star className="h-5 w-5" fill={snippet.isFavorite ? "currentColor" : "none"} />
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button 
-                  type="button" 
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                  aria-label="More options"
-                >
-                  <MoreVertical className="h-5 w-5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={copyToClipboard}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy code
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleShare} disabled={isSharing}>
-                  <Share2 className="h-4 w-4 mr-2" />
-                  {isSharing ? "Creating share link..." : "Share"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleTogglePublic} disabled={isTogglePublic}>
-                  <Globe className="h-4 w-4 mr-2" />
-                  {isTogglePublic 
-                    ? "Updating..." 
-                    : snippet.isPublic 
-                      ? "Make private" 
-                      : "Make public"
-                  }
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsCollectionDialogOpen(true)}>
-                  <FolderPlus className="h-4 w-4 mr-2" />
-                  Add to collection
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleEdit}>
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setShowConfirmDelete(true)}
-                  className="text-red-600 focus:text-red-600"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {!isPublicView && (
+              <button 
+                type="button" 
+                onClick={handleFavoriteToggle}
+                className={cn(
+                  snippet.isFavorite 
+                    ? "text-amber-400 hover:text-amber-500" 
+                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                )}
+                aria-label={snippet.isFavorite ? "Remove from favorites" : "Add to favorites"}
+              >
+                <Star className="h-5 w-5" fill={snippet.isFavorite ? "currentColor" : "none"} />
+              </button>
+            )}
+            {!isPublicView && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button 
+                    type="button" 
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    aria-label="More options"
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={copyToClipboard}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy code
+                  </DropdownMenuItem>
+                  {isOwner && (
+                    <>
+                      <DropdownMenuItem onClick={handleShare} disabled={isSharing}>
+                        <Share2 className="h-4 w-4 mr-2" />
+                        {isSharing ? "Creating share link..." : "Share"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleTogglePublic} disabled={isTogglePublic}>
+                        <Globe className="h-4 w-4 mr-2" />
+                        {isTogglePublic 
+                          ? "Updating..." 
+                          : snippet.isPublic 
+                            ? "Make private" 
+                            : "Make public"
+                        }
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setIsCollectionDialogOpen(true)}>
+                        <FolderPlus className="h-4 w-4 mr-2" />
+                        Add to collection
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleEdit}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setShowConfirmDelete(true)}
+                        className="text-red-600 focus:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
         

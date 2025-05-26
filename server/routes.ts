@@ -484,6 +484,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ────────────────────────────────────────────────────────────────
+  // ─── 3.2.1) PUBLIC Snippets endpoints ──────────────────────────
+  // ────────────────────────────────────────────────────────────────
+
+  // GET all public snippets
+  app.get("/api/public/snippets", async (req, res) => {
+    try {
+      const filters: any = { isPublic: true };
+      if (req.query.search) filters.search = String(req.query.search);
+      if (req.query.language) filters.language = req.query.language;
+      if (req.query.tag) filters.tag = req.query.tag;
+
+      const snippets = await storage.getSnippets(filters);
+      res.json(snippets);
+    } catch (err: any) {
+      console.error("GET /api/public/snippets error:", err);
+      res.status(500).json({ message: "Failed to get public snippets", error: err.message });
+    }
+  });
+
+  // GET single public snippet by ID
+  app.get("/api/public/snippets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const snippet = await storage.getSnippet(id);
+
+      if (snippet && snippet.isPublic) {
+        // Optionally increment view count for public views as well
+        // await storage.incrementSnippetViewCount(id); 
+        res.json(snippet);
+      } else {
+        res.status(404).json({ message: "Snippet not found or not public" });
+      }
+    } catch (err: any) {
+      console.error(`GET /api/public/snippets/${req.params.id} error:`, err);
+      res.status(500).json({ message: "Failed to get public snippet", error: err.message });
+    }
+  });
+
   // TOGGLE FAVORITE (requires authentication)
   app.post("/api/snippets/:id/favorite", authMiddleware, async (req, res) => {
     try {
