@@ -19,7 +19,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-// Snippet schema
+// Snippet schema - Maps DB columns to TS properties
 export const snippets = pgTable("snippets", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -27,13 +27,13 @@ export const snippets = pgTable("snippets", {
   code: text("code").notNull(),
   language: text("language").notNull(),
   tags: text("tags").array(),
-  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  viewCount: integer("view_count").default(0),
-  isFavorite: boolean("is_favorite").default(false),
-  shareId: text("share_id").unique(), // Unique identifier for sharing
-  isPublic: boolean("is_public").default(false), // Controls if the snippet is publicly accessible
+  userId: text("userid"), // TS property "userId" maps to DB column "userid"
+  createdAt: timestamp("createdat", { withTimezone: true }).defaultNow().notNull(), // TS "createdAt" → DB "createdat"
+  updatedAt: timestamp("updatedat", { withTimezone: true }).defaultNow().notNull(), // TS "updatedAt" → DB "updatedat"
+  viewCount: integer("viewcount").default(0), // TS "viewCount" → DB "viewcount"
+  isFavorite: boolean("isfavorite").default(false), // TS "isFavorite" → DB "isfavorite"
+  shareId: text("shareid").unique(), // TS "shareId" → DB "shareid"
+  isPublic: boolean("ispublic").default(false), // TS "isPublic" → DB "ispublic"
 });
 
 export const insertSnippetSchema = createInsertSchema(snippets).omit({
@@ -48,14 +48,14 @@ export const insertSnippetSchema = createInsertSchema(snippets).omit({
 export type InsertSnippet = z.infer<typeof insertSnippetSchema>;
 export type Snippet = typeof snippets.$inferSelect;
 
-// Collections schema
+// Collections schema - Maps DB columns to TS properties
 export const collections = pgTable("collections", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  userId: text("userid"), // TS property "userId" maps to DB column "userid"
+  createdAt: timestamp("createdat", { withTimezone: true }).defaultNow().notNull(), // TS "createdAt" → DB "createdat"
+  updatedAt: timestamp("updatedat", { withTimezone: true }).defaultNow().notNull(), // TS "updatedAt" → DB "updatedat"
 });
 
 export const insertCollectionSchema = createInsertSchema(collections).omit({
@@ -67,7 +67,7 @@ export const insertCollectionSchema = createInsertSchema(collections).omit({
 export type InsertCollection = z.infer<typeof insertCollectionSchema>;
 export type Collection = typeof collections.$inferSelect;
 
-// Collection Items (for associating snippets with collections)
+// Collection Items
 export const collectionItems = pgTable("collection_items", {
   id: serial("id").primaryKey(),
   collectionId: integer("collection_id").notNull(),
@@ -83,16 +83,14 @@ export const insertCollectionItemSchema = createInsertSchema(collectionItems).om
 export type InsertCollectionItem = z.infer<typeof insertCollectionItemSchema>;
 export type CollectionItem = typeof collectionItems.$inferSelect;
 
-// Comments schema
+// Comments schema - Maps DB columns to TS properties
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
-  snippetId: integer("snippet_id").notNull(),
+  snippetId: integer("snippetid").notNull(), // TS "snippetId" → DB "snippetid"
   content: text("content").notNull(),
-  authorName: text("author_name").notNull(), // For guest comments without authentication
-  authorEmail: text("author_email"), // Optional email for notifications
-  userId: text("user_id"), // Changed from integer to text for Firebase UIDs
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  userId: text("userid"), // TS "userId" → DB "userid"
+  createdAt: timestamp("createdat", { withTimezone: true }).defaultNow().notNull(), // TS "createdAt" → DB "createdat"
+  updatedAt: timestamp("updatedat", { withTimezone: true }).defaultNow().notNull(), // TS "updatedAt" → DB "updatedat"
 });
 
 export const insertCommentSchema = createInsertSchema(comments).omit({
