@@ -1,6 +1,5 @@
 // client/src/pages/PublicHome.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-// Link might be removed if not used elsewhere after this change
 import { Link } from 'wouter'; 
 import { useAuthContext } from '@/contexts/AuthContext'; // Added
 import SnippetGrid from '@/components/SnippetGrid'; // Adjust path as needed
