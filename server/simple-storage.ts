@@ -5,9 +5,29 @@ class SimpleStorage {
     try {
       console.log('SimpleStorage: Getting snippets with filters:', filters);
       
-      // Simple implementation without filters for debugging
-      const result = await query('SELECT * FROM snippets ORDER BY id DESC', []);
-      console.log(`SimpleStorage: Found ${result.rows.length} snippets`);
+      let sqlQuery = 'SELECT * FROM snippets';
+      const params: any[] = [];
+      let whereClauseAdded = false;
+
+      if (filters?.userId) {
+        sqlQuery += ' WHERE userid = $1';
+        params.push(filters.userId);
+        whereClauseAdded = true;
+      }
+
+      // Add other potential filters here if simpleStorage is ever expanded
+      // For example:
+      // if (filters?.language) {
+      //   sqlQuery += whereClauseAdded ? ' AND' : ' WHERE';
+      //   sqlQuery += ` language = $${params.length + 1}`;
+      //   params.push(filters.language);
+      //   whereClauseAdded = true;
+      // }
+
+      sqlQuery += ' ORDER BY updatedat DESC'; // Changed to updatedat
+      
+      const result = await query(sqlQuery, params);
+      console.log(`SimpleStorage: Found ${result.rows.length} snippets with query: ${sqlQuery}`);
       
       return result.rows;
     } catch (error) {
