@@ -30,14 +30,6 @@ export default function AboutModal({ open, onOpenChange }: AboutModalProps) {
           <DialogDescription className="text-center">
             A modern visual code-snippet manager
           </DialogDescription>
-
-          <button
-            onClick={() => onOpenChange(false)}
-            className="absolute right-4 top-4 rounded-sm p-1 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
         </DialogHeader>
 
         <section className="space-y-6 py-4 text-sm">
