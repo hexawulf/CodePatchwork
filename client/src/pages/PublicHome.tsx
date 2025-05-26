@@ -1,6 +1,7 @@
 // client/src/pages/PublicHome.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'wouter'; // Or your routing library
+import { Link } from 'wouter'; 
+import { useAuthContext } from '@/contexts/AuthContext'; // Added
 import SnippetGrid from '@/components/SnippetGrid'; // Adjust path as needed
 import { Input } from '@/components/ui/input'; // Adjust path for your UI components
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Adjust path
@@ -11,6 +12,7 @@ import Layout from '@/components/Layout'; // Adjust path for Layout component
 const ALL_ITEMS_VALUE = "_ALL_"; // Define placeholder for "All" options
 
 const PublicHome: React.FC = () => {
+  const { signIn } = useAuthContext(); // Added
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [allSnippets, setAllSnippets] = useState<Snippet[]>([]); // Store all fetched snippets for client-side filtering
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -119,11 +121,13 @@ const PublicHome: React.FC = () => {
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-6">
             Discover & Share Code Snippets with the World.
           </p>
-          <Link href="/login"> {/* Adjust if your login route is different */}
-            <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white">
-              Sign In / Sign Up
-            </Button>
-          </Link>
+          <Button 
+            size="lg" 
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => signIn()} // Call the signIn function from context
+          >
+            Sign In / Sign Up
+          </Button>
         </header>
 
         <div className="mb-8 p-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
