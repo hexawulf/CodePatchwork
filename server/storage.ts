@@ -22,6 +22,7 @@ export interface IStorage {
     tag?: string | string[];
     favorites?: boolean;
     isPublic?: boolean;
+    userId?: string; // Added userId
   }): Promise<Snippet[]>;
   getSnippet(id: number): Promise<Snippet | undefined>;
   createSnippet(snippet: InsertSnippet): Promise<Snippet>;
@@ -446,10 +447,16 @@ func main() {
     tag?: string | string[];
     favorites?: boolean;
     isPublic?: boolean;
+    userId?: string; // Added userId
   }): Promise<Snippet[]> {
     let snippets = Array.from(this.snippets.values());
     
     if (filters) {
+      // Filter by userId
+      if (filters.userId) {
+        snippets = snippets.filter(s => s.userId === filters.userId);
+      }
+      
       // Filter by language - support both single language and multiple languages
       if (filters.language) {
         if (Array.isArray(filters.language)) {
@@ -875,11 +882,19 @@ export class DatabaseStorage implements IStorage {
     tag?: string | string[];
     favorites?: boolean;
     isPublic?: boolean;
+    userId?: string; // Added userId
   }): Promise<Snippet[]> {
     const { db } = await import('./db');
     let query = db.select().from(snippets);
+    const conditions = [];
     
     if (filters) {
+      // Handle userId filter
+      if (filters.userId) {
+        conditions.push(eq(snippets.userId, filters.userId));
+      }
+      
+      // Handle language filter (single string or array)
       // Handle language filter (single string or array)
       if (filters.language) {
         if (Array.isArray(filters.language)) {
@@ -888,17 +903,17 @@ export class DatabaseStorage implements IStorage {
             eq(snippets.language, lang)
           );
           if (languageConditions.length > 0) {
-            query = query.where(or(...languageConditions));
+            conditions.push(or(...languageConditions));
           }
         } else {
           // Single language
-          query = query.where(eq(snippets.language, filters.language));
+          conditions.push(eq(snippets.language, filters.language));
         }
       }
       
       // Handle search filter
       if (filters.search) {
-        query = query.where(
+        conditions.push(
           or(
             ilike(snippets.title, `%${filters.search}%`),
             ilike(snippets.description || '', `%${filters.search}%`),
@@ -912,12 +927,12 @@ export class DatabaseStorage implements IStorage {
         if (Array.isArray(filters.tag)) {
           // Use ANY operator for array of tags
           const tagArray = filters.tag.map(t => t.toString());
-          query = query.where(
+          conditions.push(
             sql`${snippets.tags} && ARRAY[${tagArray}]::text[]`
           );
         } else {
           // Single tag using contains operator
-          query = query.where(
+          conditions.push(
             sql`${snippets.tags} @> ARRAY[${filters.tag}]::text[]`
           );
         }
@@ -925,13 +940,18 @@ export class DatabaseStorage implements IStorage {
       
       // Handle favorites filter
       if (filters.favorites) {
-        query = query.where(eq(snippets.isFavorite, true));
+        conditions.push(eq(snippets.isFavorite, true));
       }
 
       // Filter by public status
       if (filters.isPublic !== undefined) {
-        query = query.where(eq(snippets.isPublic, filters.isPublic));
+        conditions.push(eq(snippets.isPublic, filters.isPublic));
       }
+    }
+    
+    // Apply all conditions if any
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
     }
     
     // Order by most recently updated

@@ -132,18 +132,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── 3.2) Snippets endpoints ─────────────────────────────────────
   // ────────────────────────────────────────────────────────────────
   
-  // GET all snippets (public access)
-  app.get("/api/snippets", async (req, res) => {
+  // GET all snippets (requires authentication)
+  app.get("/api/snippets", authMiddleware, async (req, res) => {
     try {
       console.log("[GET_ALL] Get all snippets request received");
+      const userId = (req as any).user.id;
       
-      const filters: any = {};
+      const filters: any = { userId }; // Add userId to filters
       if (req.query.search) filters.search = String(req.query.search);
       if (req.query.language) filters.language = req.query.language;
       if (req.query.tag) filters.tag = req.query.tag;
       if (req.query.favorites === "true") filters.favorites = true;
       
       try {
+        // Assuming simpleStorage.getSnippets is updated or we prioritize storage
         const list = await simpleStorage.getSnippets(filters);
         console.log(`[GET_ALL] Found ${list.length} snippets using simpleStorage`);
         return res.json(list);
@@ -163,9 +165,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               SELECT id, title, code, language, description, tags, userid, createdat, updatedat, 
                     isfavorite, ispublic, shareid, viewcount 
               FROM snippets 
-              WHERE 1=1
+              WHERE userid = $1
             `;
-            const params: any[] = [];
+            const params: any[] = [userId];
             
             if (filters.search) {
               query += ` AND (title ILIKE $${params.length + 1} OR description ILIKE $${params.length + 1})`;
