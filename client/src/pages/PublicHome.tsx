@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'; // Adjust path
 import { type Snippet } from '@shared/schema'; // Adjust path
 import Layout from '@/components/Layout'; // Adjust path for Layout component
 
+const ALL_ITEMS_VALUE = "_ALL_"; // Define placeholder for "All" options
+
 const PublicHome: React.FC = () => {
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [allSnippets, setAllSnippets] = useState<Snippet[]>([]); // Store all fetched snippets for client-side filtering
@@ -52,11 +54,15 @@ const PublicHome: React.FC = () => {
         const languages = new Set<string>();
         const tags = new Set<string>();
         data.forEach(snippet => {
-          if (snippet.language) languages.add(snippet.language);
-          snippet.tags?.forEach(tag => tags.add(tag));
+          if (snippet.language && snippet.language.trim() !== '') { languages.add(snippet.language); }
+          snippet.tags?.forEach(tag => {
+            if (tag && tag.trim() !== '') {
+              tags.add(tag);
+            }
+          });
         });
-        setAvailableLanguages(['', ...Array.from(languages)]); // Add empty option for "All"
-        setAvailableTags(['', ...Array.from(tags)]); // Add empty option for "All"
+        setAvailableLanguages([ALL_ITEMS_VALUE, ...Array.from(languages)]);
+        setAvailableTags([ALL_ITEMS_VALUE, ...Array.from(tags)]);
 
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred.');
@@ -80,11 +86,11 @@ const PublicHome: React.FC = () => {
       );
     }
 
-    if (selectedLanguage) {
+    if (selectedLanguage && selectedLanguage !== ALL_ITEMS_VALUE) {
       filtered = filtered.filter(snippet => snippet.language === selectedLanguage);
     }
 
-    if (selectedTag) {
+    if (selectedTag && selectedTag !== ALL_ITEMS_VALUE) {
       filtered = filtered.filter(snippet => snippet.tags?.includes(selectedTag));
     }
 
@@ -145,8 +151,11 @@ const PublicHome: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {availableLanguages.map(lang => (
-                    <SelectItem key={lang || 'all-langs'} value={lang}>
-                      {lang || 'All Languages'}
+                    <SelectItem 
+                      key={lang === ALL_ITEMS_VALUE ? 'all-langs-key' : lang} 
+                      value={lang}
+                    >
+                      {lang === ALL_ITEMS_VALUE ? 'All Languages' : lang}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -163,8 +172,11 @@ const PublicHome: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {availableTags.map(tag => (
-                    <SelectItem key={tag || 'all-tags'} value={tag}>
-                      {tag || 'All Tags'}
+                    <SelectItem 
+                      key={tag === ALL_ITEMS_VALUE ? 'all-tags-key' : tag} 
+                      value={tag}
+                    >
+                      {tag === ALL_ITEMS_VALUE ? 'All Tags' : tag}
                     </SelectItem>
                   ))}
                 </SelectContent>
