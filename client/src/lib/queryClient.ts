@@ -12,6 +12,78 @@ interface ApiRequestOptions {
   expectJson?: boolean;
 }
 
+// Transform functions to convert database column names to TypeScript property names
+function transformCollection(collection: any) {
+  if (!collection) return collection;
+  return {
+    id: collection.id,
+    name: collection.name,
+    description: collection.description,
+    userId: collection.userid || collection.userId,           // Handle both formats
+    createdAt: collection.createdat || collection.createdAt,  // Handle both formats
+    updatedAt: collection.updatedat || collection.updatedAt,  // Handle both formats
+  };
+}
+
+function transformSnippet(snippet: any) {
+  if (!snippet) return snippet;
+  return {
+    id: snippet.id,
+    title: snippet.title,
+    description: snippet.description,
+    code: snippet.code,
+    language: snippet.language,
+    tags: snippet.tags,
+    userId: snippet.userid || snippet.userId,
+    createdAt: snippet.createdat || snippet.createdAt,
+    updatedAt: snippet.updatedat || snippet.updatedAt,
+    viewCount: snippet.viewcount || snippet.viewCount,
+    isFavorite: snippet.isfavorite || snippet.isFavorite,
+    shareId: snippet.shareid || snippet.shareId,
+    isPublic: snippet.ispublic || snippet.isPublic,
+  };
+}
+
+function transformComment(comment: any) {
+  if (!comment) return comment;
+  return {
+    id: comment.id,
+    snippetId: comment.snippetid || comment.snippetId,
+    content: comment.content,
+    userId: comment.userid || comment.userId,
+    createdAt: comment.createdat || comment.createdAt,
+    updatedAt: comment.updatedat || comment.updatedAt,
+  };
+}
+
+// Transform API responses based on URL patterns
+function transformApiResponse(url: string, data: any) {
+  if (!data) return data;
+  
+  // Handle array responses
+  if (Array.isArray(data)) {
+    if (url.includes('/collections')) {
+      return data.map(transformCollection);
+    } else if (url.includes('/snippets')) {
+      return data.map(transformSnippet);
+    } else if (url.includes('/comments')) {
+      return data.map(transformComment);
+    }
+    return data;
+  }
+  
+  // Handle single object responses
+  if (url.includes('/collections')) {
+    return transformCollection(data);
+  } else if (url.includes('/snippets')) {
+    return transformSnippet(data);
+  } else if (url.includes('/comments')) {
+    return transformComment(data);
+  }
+  
+  return data;
+}
+
 export async function apiRequest<T = any>(
   method: string,
   url: string,
@@ -79,7 +151,10 @@ export async function apiRequest<T = any>(
       throw new Error(json.message || `API error: ${res.status}`);
     }
     console.log(`[apiRequest] ${method} ${url} completed successfully`);
-    return json;
+    
+    // Transform the response before returning
+    const transformedJson = transformApiResponse(url, json);
+    return transformedJson;
   } else {
     // Not JSON, likely an error page
     if (!res.ok) {
@@ -114,7 +189,8 @@ export const getQueryFn: <T>(options: {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const res = await fetch(queryKey[0] as string, {
+    const url = queryKey[0] as string;
+    const res = await fetch(url, {
       headers,
       credentials: "include",
     });
@@ -124,7 +200,10 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    const json = await res.json();
+    
+    // Transform the response before returning
+    return transformApiResponse(url, json);
   };
 
 export const queryClient = new QueryClient({
