@@ -40,7 +40,7 @@ export const CodePatchworkLogo: React.FC<LogoProps> = ({
       <text className="symbol" x="213.3" y="128">PY</text>
       <text className="symbol" x="42.6" y="213.3">01</text>
       <text className="symbol" x="128" y="213.3">.PY</text>
-      <text className="symbol" x="213.3" y="213.3">⎇</text>
+      <text className="symbol" x="213.3" y="213.3">{"⎇"}</text>
     </svg>
   );
 };
