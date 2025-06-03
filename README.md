@@ -1,22 +1,72 @@
 # CodePatchwork 🧩
+<div align="center">
 
-A visual code snippet manager that combines the visual appeal of Pinterest with the functionality of GitHub Gists. CodePatchwork transforms how developers manage code snippets by replacing scattered text files and notes with a visually appealing, searchable repository.
+[![GitHub stars](https://img.shields.io/github/stars/hexawulf/CodePatchwork?style=social)](https://github.com/hexawulf/CodePatchwork/stargazers)
+[![Live Demo](https://img.shields.io/badge/🚀_Demo-Live-success?style=flat-square)](https://www.codepatchwork.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
+**Transform your scattered code snippets into a beautiful, searchable visual library**
+
+*A visual code snippet manager that combines the visual appeal of Pinterest with the functionality of GitHub Gists.*
 
 ![CodePatchwork Banner](codepatchwork-banner.png)
 
+</div>
+
+## 🌟 **Try CodePatchwork Live!**
+
+<div align="center">
+
+### **👉 [🚀 EXPERIENCE THE DEMO](https://www.codepatchwork.com) 👈**
+
+*See CodePatchwork in action - no installation required!*
+
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-CodePatchwork.com-blue?style=for-the-badge&logoColor=white)](https://www.codepatchwork.com)
+
+</div>
+
+---
+
+## 📋 Table of Contents
+- [🌟 Live Demo](#-try-codepatchwork-live)
+- [✨ Features](#-features)
+- [🚀 Getting Started](#-getting-started)
+- [🔧 Usage](#-usage)
+- [🛠️ Technologies](#️-technologies-used)
+- [🤝 Contributing](#-contributing)
+
+## ⚡ Quick Start
+
+Want to jump right in? **[Try the live demo](https://www.codepatchwork.com)** - no installation needed!
+
+For local development, you'll need Node.js 18+ and PostgreSQL. See detailed setup below ⬇️
+
 ## ✨ Features
 
-- **Visual Organization**: Manage code snippets with a Pinterest-style visual interface
-- **Syntax Highlighting**: Automatic code highlighting for 100+ programming languages
-- **Powerful Search & Filtering**: Find snippets by language, tags, or full-text search
-- **Collections**: Organize snippets into custom collections for better categorization
-- **Tags & Metadata**: Add tags and descriptions to make snippets more discoverable
-- **Authentication**: Secure sign-in with Google OAuth or email/password
-- **Responsive Design**: Works on desktop, tablet, and mobile devices
-- **Sharing**: Share snippets publicly with customizable links
-- **Import/Export**: Easily backup or migrate your snippets
-- **Dark/Light Themes**: Choose your preferred visual theme for better readability
-- **Comment System**: Collaborate and discuss code with other users
+### 🎨 **Visual Experience**
+- **Pinterest-Style Interface** - Visually appealing snippet organization
+- **Syntax Highlighting** - Beautiful code display for 100+ languages
+- **Dark/Light Themes** - Customizable visual experience
+- **Responsive Design** - Perfect on desktop, tablet, and mobile
+
+### 🔍 **Organization & Discovery**
+- **Smart Search & Filtering** - Find snippets by language, tags, or content
+- **Custom Collections** - Organize snippets into themed groups
+- **Tags & Metadata** - Rich categorization and discovery
+- **Import/Export** - Easy backup and migration
+
+### 🤝 **Collaboration & Sharing**
+- **Public Sharing** - Share snippets with customizable links
+- **Comment System** - Collaborate and discuss code
+- **Secure Authentication** - Google OAuth or email/password
+
+## 📸 Screenshots
+
+![Main Interface](screenshots/main-interface.png)
+*Beautiful Pinterest-style code snippet organization*
+
+![Dark Mode](screenshots/dark-mode.png)
+*Elegant dark theme for comfortable coding*
 
 ## 🚀 Getting Started
 
@@ -153,6 +203,18 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 ## 📧 Contact
 
 For questions or support, please open an issue on the GitHub repository.
+
+## 🌟 **Ready to Transform Your Code Snippets?**
+
+<div align="center">
+
+### **[🚀 Try CodePatchwork Now](https://www.codepatchwork.com)**
+
+[![Star this repo](https://img.shields.io/badge/⭐_Star_this_repo-black?style=for-the-badge&logo=github)](https://github.com/hexawulf/CodePatchwork)
+[![Report Bug](https://img.shields.io/badge/🐛_Report_Bug-red?style=for-the-badge)](https://github.com/hexawulf/CodePatchwork/issues)
+[![Request Feature](https://img.shields.io/badge/💡_Request_Feature-blue?style=for-the-badge)](https://github.com/hexawulf/CodePatchwork/issues)
+
+</div>
 
 ---
 
