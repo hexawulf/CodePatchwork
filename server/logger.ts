@@ -50,3 +50,4 @@ logger.on('error', (err) => {
 logger.info('🧪 Winston logger initialized and ready.');
 
 export default logger;
+export const __loggerSideEffect__ = true;

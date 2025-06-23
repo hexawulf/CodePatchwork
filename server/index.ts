@@ -12,6 +12,7 @@ import camelCase from "camelcase";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import logger from "./logger";
+import "./logger.ts"; // force esbuild to preserve it
 
 
 /* ────────────────────────────────────────────────────────────────── */

@@ -50,6 +50,12 @@ export const authMiddleware: RequestHandler = async (req, res, next) => {
 
 /** ─── 3) Register all routes ─────────────────────────────────────────────── */
 export async function registerRoutes(app: Express): Promise<Server> {
+
+
+   app.get('/api/test', (_req, res) => {
+    res.json({ message: "🧪 API test successful" });
+  });
+
   
   // ─── 3.0) Health Check Endpoint ──────────────────────────────────
   app.get("/api/health", async (req: Request, res: Response) => {
