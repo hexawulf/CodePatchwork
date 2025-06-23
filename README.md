@@ -189,8 +189,15 @@ For local development, you'll need Node.js 18+ and PostgreSQL. See detailed setu
 
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
+- `npm run test:logger` - Verify Winston file logging in `dist`
 - `npm run db:push` - Push schema changes to database
 - `npm run db:studio` - Open Drizzle Studio to manage database
+
+### Quick Logger Test
+
+After running `npm run build`, execute `npm run test:logger` to verify that
+`/home/zk/logs/codepatchwork.log` is created. The test script writes a few
+messages using the bundled logger to ensure file logging works in production.
 
 ## 📝 License
 
