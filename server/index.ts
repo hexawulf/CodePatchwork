@@ -12,6 +12,7 @@ import camelCase from "camelcase";
 import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import logger from "../src/logger.js";
 
 /* ────────────────────────────────────────────────────────────────── */
 /* 0. Verify & load your service-account JSON                        */
@@ -20,10 +21,10 @@ const svcPath = path.resolve(
   process.cwd(),
   process.env.GOOGLE_APPLICATION_CREDENTIALS!
 );
-console.log("→ SERVICE ACCOUNT path:", svcPath);
-console.log("→ Exists on disk?      ", fs.existsSync(svcPath));
+logger.info(`→ SERVICE ACCOUNT path: ${svcPath}`);
+logger.info(`→ Exists on disk?      ${fs.existsSync(svcPath)}`);
 if (!fs.existsSync(svcPath)) {
-  console.error("❌ service account JSON not found. Aborting.");
+  logger.error("❌ service account JSON not found. Aborting.");
   process.exit(1);
 }
 
@@ -91,7 +92,7 @@ app.use(
 /* 4. CRITICAL FIX: JSON-only middleware for ALL API routes          */
 /* ────────────────────────────────────────────────────────────────── */
 app.use('/api', (req, res, next) => {
-  console.log(`[API] ${req.method} ${req.path} - Request received`);
+  logger.info(`[API] ${req.method} ${req.path} - Request received`);
   
   // Force Content-Type to application/json for all API responses
   res.setHeader('Content-Type', 'application/json');
@@ -104,7 +105,7 @@ app.use('/api', (req, res, next) => {
   res.send = function(data: any) {
     // If Express tries to send HTML (like error pages), convert to JSON
     if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html>'))) {
-      console.log(`[API] 🚨 Converting HTML response to JSON for ${req.method} ${req.path}`);
+      logger.info(`[API] 🚨 Converting HTML response to JSON for ${req.method} ${req.path}`);
       this.setHeader('Content-Type', 'application/json');
       return originalSend.call(this, JSON.stringify({
         message: "API endpoint error",
@@ -125,7 +126,7 @@ app.use('/api', (req, res, next) => {
     const newSend = result.send;
     result.send = function(data: any) {
       if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html>'))) {
-        console.log(`[API] 🚨 Converting status ${statusCode} HTML to JSON for ${req.method} ${req.path}`);
+        logger.info(`[API] 🚨 Converting status ${statusCode} HTML to JSON for ${req.method} ${req.path}`);
         this.setHeader('Content-Type', 'application/json');
         return originalSend.call(this, JSON.stringify({
           message: "API Error",
@@ -203,15 +204,15 @@ app.use((req, res, next) => {
 /* 7. Route registration                                              */
 /* ────────────────────────────────────────────────────────────────── */
 (async () => {
-  console.log("🔧 Starting route registration...");
+  logger.info("🔧 Starting route registration...");
   const server = await registerRoutes(app);
-  console.log("✅ Route registration complete");
+  logger.info("✅ Route registration complete");
 
   /* ──────────────────────────────────────────────────────────────── */
   /* 8. 404 Handler for unmatched API routes - MUST BE BEFORE GLOBAL  */
   /* ──────────────────────────────────────────────────────────────── */
   app.use('/api/*', (req, res) => {
-    console.log(`[404] API route not found: ${req.method} ${req.path}`);
+    logger.info(`[404] API route not found: ${req.method} ${req.path}`);
     res.status(404).json({ 
       message: "API endpoint not found",
       path: req.path,
@@ -237,7 +238,7 @@ app.use((req, res, next) => {
   /* 9. Enhanced global error handler - MUST BE AFTER 404 HANDLER     */
   /* ──────────────────────────────────────────────────────────────── */
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-    console.error(`[💥 GLOBAL ERROR] ${req.method} ${req.path}:`, err.stack || err);
+    logger.error(`[💥 GLOBAL ERROR] ${req.method} ${req.path}:`, err.stack || err);
     
     // Ensure we don't send if headers already sent
     if (!res.headersSent) {
@@ -277,41 +278,41 @@ app.use((req, res, next) => {
       log(`🚀 Serving on port ${port}`);
       log(`📡 API available at http://localhost:${port}/api/`);
       log(`🧪 Test API at http://localhost:${port}/api/test`);
-      console.log("---");
-      console.log("🔧 API Endpoints registered:");
-      console.log("  GET    /api/test");
-      console.log("  GET    /api/snippets"); 
-      console.log("  GET    /api/snippets/:id");
-      console.log("  POST   /api/snippets");
-      console.log("  PUT    /api/snippets/:id");
-      console.log("  DELETE /api/snippets/:id");
-      console.log("  POST   /api/snippets/:id/favorite");
-      console.log("  GET    /api/languages");
-      console.log("  GET    /api/tags");
-      console.log("  POST   /api/auth/user");
-      console.log("  GET    /api/auth/me");
-      console.log("---");
+      logger.info("---");
+      logger.info("🔧 API Endpoints registered:");
+      logger.info("  GET    /api/test");
+      logger.info("  GET    /api/snippets");
+      logger.info("  GET    /api/snippets/:id");
+      logger.info("  POST   /api/snippets");
+      logger.info("  PUT    /api/snippets/:id");
+      logger.info("  DELETE /api/snippets/:id");
+      logger.info("  POST   /api/snippets/:id/favorite");
+      logger.info("  GET    /api/languages");
+      logger.info("  GET    /api/tags");
+      logger.info("  POST   /api/auth/user");
+      logger.info("  GET    /api/auth/me");
+      logger.info("---");
     }
   );
 
   // Handle process termination gracefully
   process.on('SIGTERM', () => {
-    console.log('🛑 SIGTERM received, shutting down gracefully');
+    logger.info('🛑 SIGTERM received, shutting down gracefully');
     server.close(() => {
-      console.log('✅ Server closed');
+      logger.info('✅ Server closed');
       process.exit(0);
     });
   });
 
   process.on('SIGINT', () => {
-    console.log('🛑 SIGINT received, shutting down gracefully');
+    logger.info('🛑 SIGINT received, shutting down gracefully');
     server.close(() => {
-      console.log('✅ Server closed');
+      logger.info('✅ Server closed');
       process.exit(0);
     });
   });
 
 })().catch((error) => {
-  console.error('❌ Failed to start server:', error);
+  logger.error("❌ Failed to start server:", error);
   process.exit(1);
 });
