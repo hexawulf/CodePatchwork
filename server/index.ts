@@ -1,5 +1,4 @@
-// server/index.ts  –  Express bootstrap for CodePatchwork
-/* ------------------------------------------------------------------ */
+// server/index.ts – Express bootstrap for CodePatchwork with Winston logging
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -8,22 +7,31 @@ import fs from "fs";
 import path from "path";
 import admin from "firebase-admin";
 import express, { Request, Response, NextFunction } from "express";
-import camelCase from "camelcase";
 import helmet from "helmet";
+import camelCase from "camelcase";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, serveStatic } from "./vite";
+import logger from "./logger";
+import "./logger.ts"; // force esbuild to preserve it
+
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 0. Verify & load your service-account JSON                        */
+/* 0. Winston test log – confirms logger is active                    */
+/* ────────────────────────────────────────────────────────────────── */
+logger.info("✅ Winston logger loaded from ./logger.ts");
+logger.info("🧪 Logger test: Express server startup log");
+
+/* ────────────────────────────────────────────────────────────────── */
+/* 1. Verify & load your service-account JSON                         */
 /* ────────────────────────────────────────────────────────────────── */
 const svcPath = path.resolve(
   process.cwd(),
   process.env.GOOGLE_APPLICATION_CREDENTIALS!
 );
-console.log("→ SERVICE ACCOUNT path:", svcPath);
-console.log("→ Exists on disk?      ", fs.existsSync(svcPath));
+logger.info(`→ SERVICE ACCOUNT path: ${svcPath}`);
+logger.info(`→ Exists on disk?      ${fs.existsSync(svcPath)}`);
 if (!fs.existsSync(svcPath)) {
-  console.error("❌ service account JSON not found. Aborting.");
+  logger.error("❌ service account JSON not found. Aborting.");
   process.exit(1);
 }
 
@@ -32,36 +40,32 @@ const serviceAccount = JSON.parse(
 );
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 1. Initialize Firebase Admin with explicit cert                   */
+/* 2. Initialize Firebase Admin                                       */
 /* ────────────────────────────────────────────────────────────────── */
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 2. Express + Body parsers                                         */
+/* 3. Express setup                                                   */
 /* ────────────────────────────────────────────────────────────────── */
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 3. Security headers - Modified to fix Firebase auth                */
+/* 4. Helmet security headers                                         */
 /* ────────────────────────────────────────────────────────────────── */
-// Disable all helmet protections and apply only what we need
 app.use(
-  // Completely disable COOP and COEP policies for auth popups
   helmet.crossOriginOpenerPolicy({ policy: "unsafe-none" }),
   helmet.crossOriginEmbedderPolicy({ policy: "unsafe-none" }),
-  
-  // Apply minimum security headers to allow Firebase auth
   helmet.contentSecurityPolicy({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: [
-        "'self'", 
+        "'self'",
         "'unsafe-inline'",
-        "'unsafe-eval'", // Needed for some Firebase operations
+        "'unsafe-eval'",
         "https://www.gstatic.com",
         "https://apis.google.com",
         "https://*.firebaseio.com",
@@ -88,23 +92,19 @@ app.use(
 );
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 4. CRITICAL FIX: JSON-only middleware for ALL API routes          */
+/* 5. API middleware                                                  */
 /* ────────────────────────────────────────────────────────────────── */
 app.use('/api', (req, res, next) => {
-  console.log(`[API] ${req.method} ${req.path} - Request received`);
-  
-  // Force Content-Type to application/json for all API responses
+  logger.info(`[API] ${req.method} ${req.path} - Request received`);
+
   res.setHeader('Content-Type', 'application/json');
-  
-  // Override Express's default error handling to ensure JSON responses
+
   const originalSend = res.send;
   const originalStatus = res.status;
-  
-  // Ensure res.send always returns JSON for API routes
+
   res.send = function(data: any) {
-    // If Express tries to send HTML (like error pages), convert to JSON
     if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html>'))) {
-      console.log(`[API] 🚨 Converting HTML response to JSON for ${req.method} ${req.path}`);
+      logger.info(`[API] 🚨 Converting HTML response to JSON for ${req.method} ${req.path}`);
       this.setHeader('Content-Type', 'application/json');
       return originalSend.call(this, JSON.stringify({
         message: "API endpoint error",
@@ -116,16 +116,13 @@ app.use('/api', (req, res, next) => {
     }
     return originalSend.call(this, data);
   };
-  
-  // Override res.status to ensure chaining works with JSON
+
   res.status = function(statusCode: number) {
     const result = originalStatus.call(this, statusCode);
-    
-    // If someone calls res.status().send() with HTML, intercept it
     const newSend = result.send;
     result.send = function(data: any) {
       if (typeof data === 'string' && (data.includes('<!DOCTYPE') || data.includes('<html>'))) {
-        console.log(`[API] 🚨 Converting status ${statusCode} HTML to JSON for ${req.method} ${req.path}`);
+        logger.info(`[API] 🚨 Converting status ${statusCode} HTML to JSON for ${req.method} ${req.path}`);
         this.setHeader('Content-Type', 'application/json');
         return originalSend.call(this, JSON.stringify({
           message: "API Error",
@@ -137,15 +134,14 @@ app.use('/api', (req, res, next) => {
       }
       return newSend.call(this, data);
     };
-    
     return result;
   };
-  
+
   next();
 });
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 5. Normalize /api/snippets payload (snake → camel, ISO dates)     */
+/* 6. Normalize response keys                                         */
 /* ────────────────────────────────────────────────────────────────── */
 app.use("/api/snippets", (_req, res, next) => {
   type Row = Record<string, unknown>;
@@ -174,7 +170,7 @@ app.use("/api/snippets", (_req, res, next) => {
 });
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 6. Simple API request logger                                      */
+/* 7. Performance + payload logging                                  */
 /* ────────────────────────────────────────────────────────────────── */
 app.use((req, res, next) => {
   const t0 = Date.now();
@@ -192,7 +188,7 @@ app.use((req, res, next) => {
       let msg = `${req.method} ${req.path} ${res.statusCode} in ${ms}ms`;
       if (payload) msg += ` :: ${JSON.stringify(payload)}`;
       if (msg.length > 80) msg = msg.slice(0, 79) + "…";
-      log(msg);
+      logger.info(msg);
     }
   });
 
@@ -200,19 +196,16 @@ app.use((req, res, next) => {
 });
 
 /* ────────────────────────────────────────────────────────────────── */
-/* 7. Route registration                                              */
+/* 8. Route registration + boot                                       */
 /* ────────────────────────────────────────────────────────────────── */
 (async () => {
-  console.log("🔧 Starting route registration...");
+  logger.info("🔧 Starting route registration...");
   const server = await registerRoutes(app);
-  console.log("✅ Route registration complete");
+  logger.info("✅ Route registration complete");
 
-  /* ──────────────────────────────────────────────────────────────── */
-  /* 8. 404 Handler for unmatched API routes - MUST BE BEFORE GLOBAL  */
-  /* ──────────────────────────────────────────────────────────────── */
   app.use('/api/*', (req, res) => {
-    console.log(`[404] API route not found: ${req.method} ${req.path}`);
-    res.status(404).json({ 
+    logger.info(`[404] API route not found: ${req.method} ${req.path}`);
+    res.status(404).json({
       message: "API endpoint not found",
       path: req.path,
       method: req.method,
@@ -222,7 +215,7 @@ app.use((req, res, next) => {
         "GET /api/snippets",
         "GET /api/snippets/:id",
         "POST /api/snippets",
-        "PUT /api/snippets/:id", 
+        "PUT /api/snippets/:id",
         "DELETE /api/snippets/:id",
         "POST /api/snippets/:id/favorite",
         "GET /api/languages",
@@ -233,15 +226,9 @@ app.use((req, res, next) => {
     });
   });
 
-  /* ──────────────────────────────────────────────────────────────── */
-  /* 9. Enhanced global error handler - MUST BE AFTER 404 HANDLER     */
-  /* ──────────────────────────────────────────────────────────────── */
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-    console.error(`[💥 GLOBAL ERROR] ${req.method} ${req.path}:`, err.stack || err);
-    
-    // Ensure we don't send if headers already sent
+    logger.error(`[💥 GLOBAL ERROR] ${req.method} ${req.path}:`, err.stack || err);
     if (!res.headersSent) {
-      // Always return JSON for API routes
       if (req.path.startsWith('/api/')) {
         res.setHeader('Content-Type', 'application/json');
         res.status(err.status || 500).json({
@@ -252,66 +239,56 @@ app.use((req, res, next) => {
           error: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.stack
         });
       } else {
-        // For non-API routes, use your original behavior
         res.status(err.status || 500).json({ message: err.message || "Error" });
       }
     }
   });
 
-  /* ──────────────────────────────────────────────────────────────── */
-  /* 10. Vite in dev or static in prod                               */
-  /* ──────────────────────────────────────────────────────────────── */
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  /* ──────────────────────────────────────────────────────────────── */
-  /* 11. Start HTTP server                                           */
-  /* ──────────────────────────────────────────────────────────────── */
   const port = Number(process.env.PORT) || 3001;
-  server.listen(
-    { host: "0.0.0.0", port, reusePort: true },
-    () => {
-      log(`🚀 Serving on port ${port}`);
-      log(`📡 API available at http://localhost:${port}/api/`);
-      log(`🧪 Test API at http://localhost:${port}/api/test`);
-      console.log("---");
-      console.log("🔧 API Endpoints registered:");
-      console.log("  GET    /api/test");
-      console.log("  GET    /api/snippets"); 
-      console.log("  GET    /api/snippets/:id");
-      console.log("  POST   /api/snippets");
-      console.log("  PUT    /api/snippets/:id");
-      console.log("  DELETE /api/snippets/:id");
-      console.log("  POST   /api/snippets/:id/favorite");
-      console.log("  GET    /api/languages");
-      console.log("  GET    /api/tags");
-      console.log("  POST   /api/auth/user");
-      console.log("  GET    /api/auth/me");
-      console.log("---");
-    }
-  );
+  logger.info(`🚀 Express server starting on port ${process.env.PORT || 3001}`);
+  server.listen({ host: "0.0.0.0", port, reusePort: true }, () => {
+    logger.info(`🚀 Serving on port ${port}`);
+    logger.info(`📡 API available at http://localhost:${port}/api/`);
+    logger.info(`🧪 Test API at http://localhost:${port}/api/test`);
+    logger.info("---");
+    logger.info("🔧 API Endpoints registered:");
+    logger.info("  GET    /api/test");
+    logger.info("  GET    /api/snippets");
+    logger.info("  GET    /api/snippets/:id");
+    logger.info("  POST   /api/snippets");
+    logger.info("  PUT    /api/snippets/:id");
+    logger.info("  DELETE /api/snippets/:id");
+    logger.info("  POST   /api/snippets/:id/favorite");
+    logger.info("  GET    /api/languages");
+    logger.info("  GET    /api/tags");
+    logger.info("  POST   /api/auth/user");
+    logger.info("  GET    /api/auth/me");
+    logger.info("---");
+  });
 
-  // Handle process termination gracefully
   process.on('SIGTERM', () => {
-    console.log('🛑 SIGTERM received, shutting down gracefully');
+    logger.info('🛑 SIGTERM received, shutting down gracefully');
     server.close(() => {
-      console.log('✅ Server closed');
+      logger.info('✅ Server closed');
       process.exit(0);
     });
   });
 
   process.on('SIGINT', () => {
-    console.log('🛑 SIGINT received, shutting down gracefully');
+    logger.info('🛑 SIGINT received, shutting down gracefully');
     server.close(() => {
-      console.log('✅ Server closed');
+      logger.info('✅ Server closed');
       process.exit(0);
     });
   });
 
 })().catch((error) => {
-  console.error('❌ Failed to start server:', error);
+  logger.error("❌ Failed to start server:", error);
   process.exit(1);
 });

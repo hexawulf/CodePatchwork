@@ -6,6 +6,7 @@ import type { DecodedIdToken }                      from "firebase-admin/auth";
 import { pool }                                     from "./db";
 import { storage }                                  from "./storage";
 import { simpleStorage }                            from "./simple-storage";
+import logger                                       from "./logger";
 import {
   insertSnippetSchema,
   insertCollectionSchema,
@@ -19,10 +20,10 @@ import { z }                                       from "zod";
 ;(async () => {
   try {
     const client = await pool.connect();
-    console.log("✅ DATABASE CONNECTION TEST: OK —", (await client.query("SELECT NOW()")).rows[0].now);
+    logger.info(`✅ DATABASE CONNECTION TEST: OK — ${(await client.query("SELECT NOW()")).rows[0].now}`);
     client.release();
   } catch (e) {
-    console.error("❌ DATABASE CONNECTION TEST: FAILED", e);
+    logger.error("❌ DATABASE CONNECTION TEST: FAILED", e);
   }
 })();
 
@@ -49,6 +50,12 @@ export const authMiddleware: RequestHandler = async (req, res, next) => {
 
 /** ─── 3) Register all routes ─────────────────────────────────────────────── */
 export async function registerRoutes(app: Express): Promise<Server> {
+
+
+   app.get('/api/test', (_req, res) => {
+    res.json({ message: "🧪 API test successful" });
+  });
+
   
   // ─── 3.0) Health Check Endpoint ──────────────────────────────────
   app.get("/api/health", async (req: Request, res: Response) => {
