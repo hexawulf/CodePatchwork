@@ -1,4 +1,4 @@
-// winston-test.js
+// winston-test.ts
 import logger from './logger';
 
 logger.info("✅ Winston basic test: info level");

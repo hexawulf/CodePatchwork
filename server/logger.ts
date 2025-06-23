@@ -14,6 +14,20 @@ if (!fs.existsSync(logDir)) {
   }
 }
 
+const fileTransport = new transports.File({ filename: logFile });
+
+fileTransport.on('error', err => {
+  console.error('⚠️ File transport error:', err.message);
+  try {
+    fs.appendFileSync(
+      path.join(logDir, 'fallback.log'),
+      `[${new Date().toISOString()}] Logger failed: ${err.message}\n`
+    );
+  } catch (appendErr) {
+    console.error('⚠️ Fallback logging failed:', (appendErr as Error).message);
+  }
+});
+
 const logger = createLogger({
   level: 'info',
   format: format.combine(
@@ -25,7 +39,7 @@ const logger = createLogger({
   ),
   transports: [
     new transports.Console(),
-    new transports.File({ filename: logFile })
+    fileTransport
   ]
 });
 
