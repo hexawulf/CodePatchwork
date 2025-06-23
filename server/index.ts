@@ -11,13 +11,13 @@ import helmet from "helmet";
 import camelCase from "camelcase";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
-import logger from "./logger.js";
+import logger from "./logger";
 
 
 /* ────────────────────────────────────────────────────────────────── */
 /* 0. Winston test log – confirms logger is active                    */
 /* ────────────────────────────────────────────────────────────────── */
-logger.info("✅ Winston logger initialized: /home/zk/logs/codepatchwork.log");
+logger.info("✅ Winston logger loaded from ./logger.ts");
 logger.info("🧪 Logger test: Express server startup log");
 
 /* ────────────────────────────────────────────────────────────────── */
@@ -250,6 +250,7 @@ app.use((req, res, next) => {
   }
 
   const port = Number(process.env.PORT) || 3001;
+  logger.info(`🚀 Express server starting on port ${process.env.PORT || 3001}`);
   server.listen({ host: "0.0.0.0", port, reusePort: true }, () => {
     logger.info(`🚀 Serving on port ${port}`);
     logger.info(`📡 API available at http://localhost:${port}/api/`);

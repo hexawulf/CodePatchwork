@@ -6,7 +6,7 @@ import type { DecodedIdToken }                      from "firebase-admin/auth";
 import { pool }                                     from "./db";
 import { storage }                                  from "./storage";
 import { simpleStorage }                            from "./simple-storage";
-import logger                                       from "./logger.js";
+import logger                                       from "./logger";
 import {
   insertSnippetSchema,
   insertCollectionSchema,
