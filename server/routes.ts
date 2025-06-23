@@ -6,6 +6,7 @@ import type { DecodedIdToken }                      from "firebase-admin/auth";
 import { pool }                                     from "./db";
 import { storage }                                  from "./storage";
 import { simpleStorage }                            from "./simple-storage";
+import logger                                       from "../src/logger.js";
 import {
   insertSnippetSchema,
   insertCollectionSchema,
@@ -19,10 +20,10 @@ import { z }                                       from "zod";
 ;(async () => {
   try {
     const client = await pool.connect();
-    console.log("✅ DATABASE CONNECTION TEST: OK —", (await client.query("SELECT NOW()")).rows[0].now);
+    logger.info(`✅ DATABASE CONNECTION TEST: OK — ${(await client.query("SELECT NOW()")).rows[0].now}`);
     client.release();
   } catch (e) {
-    console.error("❌ DATABASE CONNECTION TEST: FAILED", e);
+    logger.error("❌ DATABASE CONNECTION TEST: FAILED", e);
   }
 })();
 
