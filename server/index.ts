@@ -14,6 +14,11 @@ import { setupVite, serveStatic } from "./vite";
 import logger from "./logger";
 import "./logger.ts"; // force esbuild to preserve it
 
+// Disable console.log in production to avoid verbose output
+if (process.env.NODE_ENV === "production") {
+  console.log = () => {};
+}
+
 
 /* ────────────────────────────────────────────────────────────────── */
 /* 0. Winston test log – confirms logger is active                    */
