@@ -219,4 +219,113 @@ export default function UserProfileButton() {
   };
 
   const renderAuthenticatedView = () => {
-    console.log('[UserProfil
+    console.log('[UserProfileButton] Rendering authenticated view for:', user?.email);
+    
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={user?.photoURL || undefined} alt={getDisplayName()} />
+              <AvatarFallback>{getInitials(getDisplayName())}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56" align="end" forceMount>
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-medium leading-none">{getDisplayName()}</p>
+              <p className="text-xs leading-none text-muted-foreground">
+                {user?.email || 'No email'}
+              </p>
+              {(forceAuthenticated || authIssueDetected.current) && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                  ⚠️ Fallback Auth Active
+                </p>
+              )}
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem disabled>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={forceAuthCheck}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              <span>Check Auth Status</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={toggleDebugInfo}>
+              <Bug className="mr-2 h-4 w-4" />
+              <span>Debug Info</span>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Log out</span>
+          </DropdownMenuItem>
+          {showDebugInfo && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="font-normal">
+                <div className="text-xs space-y-1">
+                  <p>Context User: {contextUser ? '✅' : '❌'}</p>
+                  <p>Fallback User: {fallbackUser ? '✅' : '❌'}</p>
+                  <p>Force Auth: {forceAuthenticated ? '✅' : '❌'}</p>
+                  <p>Checks: {debugCounts.contextCheck}/{debugCounts.storageCheck}</p>
+                </div>
+              </DropdownMenuLabel>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  const renderUnauthenticatedView = () => {
+    return (
+      <div className="flex gap-2">
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setAuthMode('login');
+            setAuthDialogOpen(true);
+          }}
+        >
+          <User className="mr-2 h-4 w-4" />
+          Log in
+        </Button>
+        <Button
+          onClick={() => {
+            setAuthMode('signup');
+            setAuthDialogOpen(true);
+          }}
+        >
+          Sign up
+        </Button>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <Button variant="ghost" className="relative h-10 w-10 rounded-full" disabled>
+        <Avatar className="h-10 w-10">
+          <AvatarFallback>...</AvatarFallback>
+        </Avatar>
+      </Button>
+    );
+  }
+
+  return (
+    <>
+      {user ? renderAuthenticatedView() : renderUnauthenticatedView()}
+      <AuthDialog 
+        isOpen={authDialogOpen} 
+        onOpenChange={setAuthDialogOpen} 
+        defaultMode={authMode}
+      />
+    </>
+  );
+}

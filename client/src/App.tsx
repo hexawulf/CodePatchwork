@@ -1,6 +1,6 @@
 // client/src/App.tsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { Redirect, Switch, Route } from "wouter"; // Added Redirect
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -8,42 +8,55 @@ import { CodeThemeProvider } from "@/contexts/CodeThemeContext";
 import { SnippetProvider } from "@/contexts/SnippetContext";
 import { CollectionProvider } from "@/contexts/CollectionContext";
 import { useAuthContext } from "@/contexts/AuthContext";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/Home"; // This is the authenticated dashboard
-import PublicHome from '@/pages/PublicHome';
-import Snippets from "@/pages/Snippets";
-import Collections from "@/pages/Collections";
-import CollectionDetail from "@/pages/CollectionDetail";
-import Tags from "@/pages/Tags";
-import Settings from "@/pages/Settings";
-import SharedSnippet from "@/pages/SharedSnippet";
+
+// Lazy load pages for better performance
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Home = lazy(() => import("@/pages/Home"));
+const PublicHome = lazy(() => import("@/pages/PublicHome"));
+const Snippets = lazy(() => import("@/pages/Snippets"));
+const Collections = lazy(() => import("@/pages/Collections"));
+const CollectionDetail = lazy(() => import("@/pages/CollectionDetail"));
+const Tags = lazy(() => import("@/pages/Tags"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const SharedSnippet = lazy(() => import("@/pages/SharedSnippet"));
+
+// Loading spinner for lazy-loaded pages
+const PageLoader = () => (
+  <div className="h-screen flex items-center justify-center">
+    <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full"></div>
+  </div>
+);
 
 // Renamed from Router to AuthenticatedRouter
 function AuthenticatedRouter() {
   return (
-    <Switch>
-      <Route path="/" component={Home} /> {/* Authenticated home/dashboard */}
-      <Route path="/snippets" component={Snippets} />
-      <Route path="/collections" component={Collections} />
-      <Route path="/collections/:id" component={CollectionDetail} />
-      <Route path="/tags" component={Tags} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/shared/:shareId" component={SharedSnippet} />
-      <Route path="/login"><Redirect to="/" /></Route> {/* Added for authenticated users */}
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={Home} /> {/* Authenticated home/dashboard */}
+        <Route path="/snippets" component={Snippets} />
+        <Route path="/collections" component={Collections} />
+        <Route path="/collections/:id" component={CollectionDetail} />
+        <Route path="/tags" component={Tags} />
+        <Route path="/settings" component={Settings} />
+        <Route path="/shared/:shareId" component={SharedSnippet} />
+        <Route path="/login"><Redirect to="/" /></Route> {/* Added for authenticated users */}
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
 function PublicRouter() {
   return (
-    <Switch>
-      <Route path="/" component={PublicHome} />
-      <Route path="/login" component={SignInTriggerPage} /> {/* Added for unauthenticated users */}
-      <Route path="/shared/:shareId" component={SharedSnippet} />
-      {/* For non-matched routes, redirect to PublicHome */}
-      <Route component={PublicHome} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={PublicHome} />
+        <Route path="/login" component={SignInTriggerPage} /> {/* Added for unauthenticated users */}
+        <Route path="/shared/:shareId" component={SharedSnippet} />
+        {/* For non-matched routes, redirect to PublicHome */}
+        <Route component={PublicHome} />
+      </Switch>
+    </Suspense>
   );
 }
 
@@ -109,13 +122,8 @@ export default function App() {
     console.log("[App] Authentication state:", loading ? "loading" : user ? "authenticated" : "not authenticated");
   }, [user, loading]);
 
-  // Apply your theme class once on mount
+  // Setup keyboard shortcuts (theme is now handled by ThemeContext)
   useEffect(() => {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const saved = localStorage.getItem("theme");
-    const isDark = saved === "dark" || (!saved && prefersDark);
-    document.documentElement.classList.toggle("dark", isDark);
-
     // Toggle debug panel with key press (Alt+D)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && e.key === 'd') {

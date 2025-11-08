@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme Toggle Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen p-8">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold mb-4">Theme Toggle Test</h1>
+        <p class="mb-4">Current theme: <span id="theme-status"></span></p>
+        
+        <button 
+            id="toggle-btn"
+            class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 dark:bg-blue-700 dark:hover:bg-blue-600"
+        >
+            Toggle Theme
+        </button>
+        
+        <div class="mt-8 p-4 border border-gray-300 dark:border-gray-700 rounded">
+            <h2 class="text-xl font-semibold mb-2">Test Card</h2>
+            <p>This card should change colors based on the theme.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Light: white bg, dark border | Dark: dark bg, light border</p>
+        </div>
+    </div>
+
+    <script>
+        const html = document.documentElement;
+        const themeStatus = document.getElementById('theme-status');
+        const toggleBtn = document.getElementById('toggle-btn');
+
+        function updateThemeStatus() {
+            const isDark = html.classList.contains('dark');
+            themeStatus.textContent = isDark ? 'Dark' : 'Light';
+            console.log('Theme classes:', html.className);
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            console.log('Before toggle:', html.className);
+            html.classList.remove('light', 'dark');
+            
+            const isDark = localStorage.getItem('theme') === 'dark';
+            const newTheme = isDark ? 'light' : 'dark';
+            
+            html.classList.add(newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            console.log('After toggle:', html.className);
+            updateThemeStatus();
+        });
+
+        // Initialize
+        updateThemeStatus();
+    </script>
+</body>
+</html>

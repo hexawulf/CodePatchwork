@@ -373,3 +373,6 @@ export function useAuthContext() {
 
 // Export the custom event name and dispatch function for components to use
 export { AUTH_STATE_CHANGE_EVENT, dispatchAuthStateChangeEvent };
+
+// Re-export useAuth from lib for components that expect it from AuthContext
+export { useAuth } from '@/lib/useAuth';

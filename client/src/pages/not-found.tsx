@@ -1,21 +1,32 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { Link } from 'wouter';
+import { Button } from '@/components/ui/button';
+import { Home, ArrowLeft } from 'lucide-react';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardContent className="pt-6">
-          <div className="flex mb-4 gap-2">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
-          </div>
-
-          <p className="mt-4 text-sm text-gray-600">
-            Did you forget to add the page to the router?
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="text-center space-y-6 p-8">
+        <div className="space-y-2">
+          <h1 className="text-9xl font-bold text-slate-300 dark:text-slate-700">404</h1>
+          <h2 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">Page Not Found</h2>
+          <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+            The page you're looking for doesn't exist or has been moved.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+        
+        <div className="flex gap-4 justify-center pt-4">
+          <Button variant="outline" onClick={() => window.history.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Go Back
+          </Button>
+          <Link href="/">
+            <Button>
+              <Home className="mr-2 h-4 w-4" />
+              Go Home
+            </Button>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

@@ -19,7 +19,7 @@ export default function Tags() {
 
   // Fetch snippets filtered by the selected tag
   const { snippets, isLoading, error } = useSnippets({
-    tag: activeTag
+    tags: activeTag
   });
 
   return (

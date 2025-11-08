@@ -31,14 +31,14 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
     try {
       setIsSubmitting(true);
       
-      await apiRequest(`/api/snippets/${snippetId}/comments`, {
-        method: 'POST',
-        body: JSON.stringify({
+      await apiRequest(
+        'POST',
+        `/api/snippets/${snippetId}/comments`,
+        {
           content: newComment,
           userId: null, // Will be replaced with actual user id when auth is implemented
-          authorName: 'Anonymous' // Temporary until auth is implemented
-        })
-      });
+        }
+      );
       
       toast({
         title: 'Comment posted',
@@ -109,12 +109,12 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
             <div key={comment.id} className="flex space-x-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-md">
               <Avatar>
                 <AvatarFallback>
-                  {comment.authorName ? comment.authorName.charAt(0).toUpperCase() : 'A'}
+                  {comment.userId ? comment.userId.charAt(0).toUpperCase() : 'A'}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{comment.authorName || 'Anonymous'}</span>
+                  <span className="font-medium">{comment.userId || 'Anonymous'}</span>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
                     {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                   </span>

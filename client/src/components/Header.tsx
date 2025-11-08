@@ -20,9 +20,10 @@ import { useSnippetContext } from "@/contexts/SnippetContext";
 
 interface HeaderProps {
   toggleMobileMenu?: () => void;
+  isPublicView?: boolean;
 }
 
-const Header = ({ toggleMobileMenu }: HeaderProps = {}) => {
+const Header = ({ toggleMobileMenu, isPublicView = false }: HeaderProps = {}) => {
   // Auth context for authentication state
   const { user, isAuthenticated, signIn, signOut } = useAuthContext();
   

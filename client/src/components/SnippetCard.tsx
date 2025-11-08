@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { type Snippet } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +37,7 @@ interface SnippetCardProps {
   isPublicView?: boolean;
 }
 
-export default function SnippetCard({ snippet, viewMode, isPublicView = false }: SnippetCardProps) {
+const SnippetCard = memo(function SnippetCard({ snippet, viewMode, isPublicView = false }: SnippetCardProps) {
   // Use the context for all operations
   const { toggleFavorite, deleteSnippet } = useSnippetContext();
   const { user } = useAuthContext();
@@ -400,4 +400,6 @@ export default function SnippetCard({ snippet, viewMode, isPublicView = false }:
       />
     </div>
   );
-}
+});
+
+export default SnippetCard;
