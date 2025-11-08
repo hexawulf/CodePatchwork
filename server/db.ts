@@ -45,7 +45,7 @@ pool.on('error', (err) => {
 export const db = drizzle(pool, { schema });
 
 // Create a simple query wrapper for direct SQL queries
-export async function query(text, params) {
+export async function query(text: any, params?: any) {
   const start = Date.now();
   try {
     const result = await pool.query(text, params);

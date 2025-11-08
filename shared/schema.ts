@@ -40,9 +40,10 @@ export const insertSnippetSchema = createInsertSchema(snippets).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-  viewCount: true,
   shareId: true,
-  isPublic: true
+}).partial({
+  viewCount: true,
+  isPublic: true,
 });
 
 export type InsertSnippet = z.infer<typeof insertSnippetSchema>;
