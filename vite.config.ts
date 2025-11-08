@@ -11,11 +11,16 @@ export default defineConfig(async () => {
       process.env.NODE_ENV !== "production" &&
       process.env.REPL_ID !== undefined
     ) {
-      const runtimeErrorOverlay = (
-        await import("@replit/vite-plugin-runtime-error-modal")
-      ).default;
-      const { cartographer } = await import("@replit/vite-plugin-cartographer");
-      return [runtimeErrorOverlay(), cartographer()];
+      try {
+        const runtimeErrorOverlay = (
+          await import("@replit/vite-plugin-runtime-error-modal")
+        ).default;
+        const { cartographer } = await import("@replit/vite-plugin-cartographer");
+        return [runtimeErrorOverlay(), cartographer()];
+      } catch {
+        // Replit plugins not available, skip them
+        return [];
+      }
     }
     return [];
   };
