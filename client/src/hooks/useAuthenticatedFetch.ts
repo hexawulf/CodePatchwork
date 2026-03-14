@@ -1,26 +1,19 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { auth } from "@/lib/firebase";
 
 export function useAuthenticatedFetch() {
-  const { currentUser } = useAuth();
-  
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
-    // If there's a current user, add the Authorization header with their UID as the token
+    const currentUser = auth.currentUser;
     if (currentUser) {
+      const token = await currentUser.getIdToken();
       const headers = {
         ...options.headers,
-        'Authorization': `Bearer ${currentUser.uid}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       };
-      
-      return fetch(url, {
-        ...options,
-        headers,
-      });
+      return fetch(url, { ...options, headers });
     }
-    
-    // Otherwise just make a regular fetch request
     return fetch(url, options);
   };
-  
+
   return { authenticatedFetch };
 }

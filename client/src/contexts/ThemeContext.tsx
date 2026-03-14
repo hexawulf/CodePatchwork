@@ -26,24 +26,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const toggleTheme = () => {
     setTheme((prevTheme) => {
       const newTheme = prevTheme === "light" ? "dark" : "light";
-      console.log(`[ThemeContext] Toggling theme from ${prevTheme} to ${newTheme}`);
       return newTheme;
     });
   };
 
   // Apply theme to document and save to localStorage
   useEffect(() => {
-    console.log(`[ThemeContext] Applying theme: ${theme}`);
-    console.log(`[ThemeContext] Before - document classes: ${document.documentElement.className}`);
-    
-    // Remove both classes first
     document.documentElement.classList.remove("light", "dark");
-    // Add the current theme class
     document.documentElement.classList.add(theme);
-    // Save to localStorage
     localStorage.setItem("theme", theme);
-    
-    console.log(`[ThemeContext] After - document classes: ${document.documentElement.className}`);
   }, [theme]);
 
   const value = {

@@ -60,26 +60,20 @@ export default function CollectionDialog({
   
   // Handle form submission
   const onSubmit = async (values: CollectionFormValues) => {
-    console.log('🚀 COLLECTION FORM SUBMIT:', values);
-    console.log('🚀 AUTH STATUS CHECK - About to create collection');
-    
     setIsSubmitting(true);
     
     try {
       if (isEditMode && collectionToEdit) {
-        console.log('🚀 CALLING updateCollection with:', values);
         await updateCollection(collectionToEdit.id, values);
       } else {
-        console.log('🚀 CALLING createCollection with:', values);
         await createCollection(values);
       }
       
-      console.log('🚀 COLLECTION OPERATION SUCCESS');
       if (onOpenChange) {
         onOpenChange(false);
       }
     } catch (error) {
-      console.error("🚀 ERROR in onSubmit:", error);
+      console.error("Collection submit error:", error);
     } finally {
       setIsSubmitting(false);
     }

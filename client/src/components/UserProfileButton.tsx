@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,7 @@ import AuthDialog from './auth/AuthDialog';
 import { useToast } from '@/hooks/use-toast';
 
 export default function UserProfileButton() {
-  const { currentUser, logout, isLoading } = useAuth();
+  const { user: currentUser, signOut: logout, loading: isLoading } = useAuthContext();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const { toast } = useToast();

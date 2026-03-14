@@ -1,6 +1,6 @@
 // client/src/components/Header.tsx
 import { useEffect, useState, useRef } from "react";
-import { useAuthContext, AUTH_STATE_CHANGE_EVENT } from "@/contexts/AuthContext";
+import { useAuthContext } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Menu, Plus, Sun, Moon, Upload, Download, Info, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,9 +32,6 @@ const Header = ({ toggleMobileMenu }: HeaderProps = {}) => {
   // Snippet context
   const { openCreateModal } = useSnippetContext();
   
-  // State for forcing auth updates
-  const [forceUpdate, setForceUpdate] = useState(0);
-  
   // Managing dialog states
   const [snippetDialogOpen, setSnippetDialogOpen] = useState(false);
   const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
@@ -44,44 +41,15 @@ const Header = ({ toggleMobileMenu }: HeaderProps = {}) => {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   
-  // Listen for auth state changes and force re-render
   useEffect(() => {
-    console.log("[Header] Component mounted with auth state:", { isAuthenticated, email: user?.email });
-    
-    // Function to handle auth state changes
-    const handleAuthChange = () => {
-      console.log("[Header] Auth state change detected, forcing update");
-      setForceUpdate(prev => prev + 1);
-    };
-    
-    // Listen for our custom auth state change event
-    window.addEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthChange);
-    
-    // Also listen for storage events (for changes in other tabs)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'auth_user') {
-        console.log("[Header] auth_user changed in localStorage, forcing update");
-        setForceUpdate(prev => prev + 1);
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Handle clicks outside of dropdown to close it
     const handleClickOutside = (event: MouseEvent) => {
       if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
         setUserDropdownOpen(false);
       }
     };
-    
     document.addEventListener('mousedown', handleClickOutside);
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthChange);
-      window.removeEventListener('storage', handleStorageChange);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [user, isAuthenticated]);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   // Helper function to handle snippet dialog opening
   const handleOpenSnippetDialog = () => {

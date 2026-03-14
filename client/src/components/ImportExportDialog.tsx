@@ -57,7 +57,6 @@ export default function ImportExportDialog({
       let token;
       try {
         token = await firebaseUser.getIdToken(true);
-        console.log("Got Firebase ID token for API request");
       } catch (tokenError) {
         console.error("Failed to get ID token:", tokenError);
         setError("Authentication token error. Please refresh the page and try again.");
@@ -91,8 +90,6 @@ export default function ImportExportDialog({
         };
       });
       
-      console.log(`Importing ${cleanSnippets.length} snippets...`);
-      
       // Send to API with auth token
       const response = await fetch("/api/snippets/import", {
         method: "POST",
@@ -111,16 +108,8 @@ export default function ImportExportDialog({
       }
       
       const result = await response.json();
-      console.log("Import successful:", result);
       
-      // Refresh snippets data - try different query keys
-      queryClient.invalidateQueries({ queryKey: ['snippets'] });
       queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
-      
-      // Force a complete refresh after a short delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
       
       // Show success message
       toast({

@@ -40,7 +40,7 @@ export default function Layout({ children, isPublicView = false }: LayoutProps) 
 
       <div className="flex-grow flex flex-col overflow-hidden">
         {/* Header - Pass isPublicView to handle mobile menu toggle visibility */}
-        <Header toggleMobileMenu={toggleMobileMenu} isPublicView={isPublicView} />
+        <Header toggleMobileMenu={toggleMobileMenu} />
         
         {/* Main Content Area - Should expand if sidebar is not present */}
         <main className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-gray-800 min-h-0">

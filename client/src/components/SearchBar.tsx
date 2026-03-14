@@ -35,7 +35,7 @@ export default function SearchBar() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      console.log("Search submitted with:", inputValue);
+
       
       // Immediately apply the search without waiting for debounce
       setSearchTerm(inputValue);

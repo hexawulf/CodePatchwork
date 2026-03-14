@@ -108,7 +108,7 @@ export default function AddSnippetDialog({
         snippet
       );
       
-      console.log(isEditing ? "Snippet updated successfully:" : "Snippet created successfully:", result);
+      // Success
       
       toast({
         title: "Success",

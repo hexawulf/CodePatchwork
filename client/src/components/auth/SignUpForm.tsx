@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -38,7 +38,11 @@ interface SignUpFormProps {
 export default function SignUpForm({ onSuccess, onLoginClick }: SignUpFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { signUp, signInWithGoogle, updateUserProfile } = useAuth();
+  const { signIn: signInWithGoogle } = useAuthContext();
+  const signUp = async (_email: string, _password: string) => {
+    throw new Error("Email/password sign-up is not yet implemented. Please use Google sign-in.");
+  };
+  const updateUserProfile = async (_name: string) => {};
   const { toast } = useToast();
 
   const form = useForm<SignUpValues>({

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
 import ForgotPasswordForm from './ForgotPasswordForm';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
@@ -29,7 +29,7 @@ export default function AuthDialog({
   defaultMode = 'login',
 }: AuthDialogProps) {
   const [mode, setMode] = useState<AuthMode>(defaultMode);
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuthContext();
   const { toast } = useToast();
 
   const handleSuccess = () => {

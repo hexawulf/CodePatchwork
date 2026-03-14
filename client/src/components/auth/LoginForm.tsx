@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -36,7 +36,10 @@ export default function LoginForm({
 }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { login, signInWithGoogle } = useAuth();
+  const { signIn: signInWithGoogle } = useAuthContext();
+  const login = async (_email: string, _password: string) => {
+    throw new Error("Email/password login is not yet implemented. Please use Google sign-in.");
+  };
   const { toast } = useToast();
 
   const form = useForm<LoginValues>({
@@ -66,17 +69,14 @@ export default function LoginForm({
   const handleGoogleSignIn = async () => {
     try {
       setIsGoogleLoading(true);
-      console.log("Starting Google sign-in process...");
       await signInWithGoogle();
-      console.log("Google sign-in completed successfully");
       toast({
         title: 'Login successful',
         description: 'Welcome to CodePatchwork!',
       });
       if (onSuccess) onSuccess();
     } catch (error) {
-      console.log("Google sign-in error in component:", error);
-      // Handle specific errors here with user-friendly messages
+      // Handle specific errors with user-friendly messages
       if ((error as any)?.code === 'auth/unauthorized-domain') {
         toast({
           title: 'Domain Not Authorized',

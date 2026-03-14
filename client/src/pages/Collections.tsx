@@ -36,26 +36,19 @@ export default function Collections() {
 
   // Handle open create collection modal
   const handleOpenCreateModal = () => {
-    console.log('🚀 Opening create collection dialog');
     setShowCreateDialog(true);
   };
 
-  // Handle close create collection modal
   const handleCloseCreateModal = () => {
-    console.log('🚀 Closing create collection dialog');
     setShowCreateDialog(false);
   };
 
-  // Handle edit collection
   const handleEditCollection = (collection: Collection) => {
-    console.log('🚀 Opening edit collection dialog for:', collection.name);
     setCollectionToEdit(collection);
     setShowEditDialog(true);
   };
 
-  // Handle close edit collection modal
   const handleCloseEditModal = () => {
-    console.log('🚀 Closing edit collection dialog');
     setShowEditDialog(false);
     setCollectionToEdit(null);
   };
