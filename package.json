@@ -54,7 +54,7 @@
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
     "firebase": "^11.7.3",
-    "firebase-admin": "^13.4.0",
+    "firebase-admin": "^13.7.0",
     "helmet": "^8.1.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.453.0",
@@ -83,17 +83,21 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",
-    "@vitejs/plugin-react": "^4.3.2",
+    "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.4.20",
-    "drizzle-kit": "^0.30.6",
-    "esbuild": "^0.25.0",
+    "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.25.4",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
-    "vite": "^5.4.14"
+    "vite": "^6.4.1"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "overrides": {
+    "http-proxy-agent": "^7.0.2",
+    "esbuild": "^0.25.4"
   }
 }
