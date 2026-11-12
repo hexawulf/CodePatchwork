@@ -6,7 +6,18 @@ import {
   comments, type Comment, type InsertComment
 } from "@shared/schema";
 import { eq, and, or, isNotNull, ilike, sql, desc, asc } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import { db } from "./db";
+
+/** Escape LIKE/ILIKE wildcards so user input matches literally. */
+export function escapeLike(input: string): string {
+  return input.replace(/[\\%_]/g, "\\$&");
+}
+
+/** 12 URL-safe characters from the OS random source. */
+export function newShareId(): string {
+  return randomBytes(9).toString("base64url");
+}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -29,8 +40,8 @@ export interface IStorage {
   incrementSnippetViewCount(id: number): Promise<void>;
   toggleSnippetFavorite(id: number): Promise<Snippet>;
 
-  getLanguages(): Promise<string[]>;
-  getTags(): Promise<string[]>;
+  getLanguages(userId?: string): Promise<string[]>;
+  getTags(userId?: string): Promise<string[]>;
 
   getCollections(userId?: string): Promise<Collection[]>;
   getCollection(id: number): Promise<Collection | undefined>;
@@ -116,10 +127,11 @@ export class DatabaseStorage implements IStorage {
       }
 
       if (filters.search) {
+        const pattern = `%${escapeLike(filters.search)}%`;
         conditions.push(
           or(
-            ilike(snippets.title, `%${filters.search}%`),
-            ilike(snippets.code, `%${filters.search}%`)
+            ilike(snippets.title, pattern),
+            ilike(snippets.code, pattern)
           )
         );
       }
@@ -164,6 +176,7 @@ export class DatabaseStorage implements IStorage {
         tags: snippet.tags || null,
         userId: snippet.userId || null,
         isFavorite: snippet.isFavorite ?? false,
+        isPublic: snippet.isPublic ?? false,
       })
       .returning();
     return result[0];
@@ -179,6 +192,8 @@ export class DatabaseStorage implements IStorage {
         description: snippet.description || null,
         tags: snippet.tags || null,
         isFavorite: snippet.isFavorite,
+        // undefined leaves the column unchanged
+        isPublic: snippet.isPublic ?? undefined,
         updatedAt: new Date(),
       })
       .where(eq(snippets.id, id))
@@ -220,18 +235,26 @@ export class DatabaseStorage implements IStorage {
 
   // ─── Languages & Tags ────────────────────────────────────────
 
-  async getLanguages(): Promise<string[]> {
-    const result = await db
-      .selectDistinct({ language: snippets.language })
-      .from(snippets);
-    return result.map((r) => r.language).filter(Boolean);
+  /** Public snippets, plus the given user's own. */
+  private visibleTo(userId?: string) {
+    return userId
+      ? or(eq(snippets.isPublic, true), eq(snippets.userId, userId))
+      : eq(snippets.isPublic, true);
   }
 
-  async getTags(): Promise<string[]> {
+  async getLanguages(userId?: string): Promise<string[]> {
+    const result = await db
+      .selectDistinct({ language: snippets.language })
+      .from(snippets)
+      .where(this.visibleTo(userId));
+    return result.map((r) => r.language).filter(Boolean).sort();
+  }
+
+  async getTags(userId?: string): Promise<string[]> {
     const allTags = await db
       .select({ tags: snippets.tags })
       .from(snippets)
-      .where(isNotNull(snippets.tags));
+      .where(and(isNotNull(snippets.tags), this.visibleTo(userId)));
 
     const uniqueTags = new Set<string>();
     allTags.forEach((row) => {
@@ -334,7 +357,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async generateShareId(snippetId: number): Promise<string> {
-    const shareId = Math.random().toString(36).substring(2, 10);
+    const shareId = newShareId();
     await db
       .update(snippets)
       .set({ shareId })
@@ -351,7 +374,7 @@ export class DatabaseStorage implements IStorage {
     const isPublic = !current.isPublic;
     let shareId = current.shareId;
     if (isPublic && !shareId) {
-      shareId = Math.random().toString(36).substring(2, 10);
+      shareId = newShareId();
     }
 
     const [updated] = await db

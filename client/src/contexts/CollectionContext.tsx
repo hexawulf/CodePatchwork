@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { type Collection, type InsertCollection, type Snippet } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 interface CollectionContextType {
   // Collection modal state
@@ -39,18 +40,20 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuthContext();
   
   // Fetch all collections
   const { data: collections = [] } = useQuery<Collection[]>({
     queryKey: ["/api/collections"],
-    retry: 1
+    enabled: !!user,
+    retry: false
   });
   
   // Fetch snippets for active collection
   const { data: activeCollectionSnippets = [] } = useQuery<Snippet[]>({
     queryKey: ["/api/collections", activeCollectionId, "snippets"],
-    enabled: activeCollectionId !== null,
-    retry: 1
+    enabled: !!user && activeCollectionId !== null,
+    retry: false
   });
   
   // Create collection mutation

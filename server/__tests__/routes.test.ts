@@ -1,296 +1,337 @@
-// server/__tests__/routes.test.ts
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import express from "express";
+import request from "supertest";
 
-import request from 'supertest';
-import express, { Express } from 'express';
-import { registerRoutes, authMiddleware } from '../routes'; // Adjust path
-import { storage } from '../storage'; // Adjust path
-import { type Snippet } from '@shared/schema'; // Adjust path
-
-// Mock the storage module
-import admin from 'firebase-admin'; // Import firebase-admin
-
-// Mock firebase-admin
-jest.mock('firebase-admin', () => ({
-  credential: {
-    cert: jest.fn(),
-  },
-  initializeApp: jest.fn(),
-  auth: () => ({
-    verifyIdToken: jest.fn(),
-  }),
+/**
+ * Route tests against an in-memory storage fake. Firebase token verification
+ * is replaced by: "token-<uid>" is a valid token for <uid>, anything else is
+ * rejected.
+ */
+const state = vi.hoisted(() => ({
+  users: new Map<string, any>(),
+  snippets: new Map<number, any>(),
+  collections: new Map<number, any>(),
+  items: [] as { collectionId: number; snippetId: number }[],
+  comments: new Map<number, any>(),
+  nextId: 100,
 }));
 
-// Mock the storage module
-jest.mock('../storage', () => ({
-  storage: {
-    getSnippets: jest.fn(),
-    getSnippet: jest.fn(),
-    getUser: jest.fn(), // Add getUser to the mock
-    upsertUser: jest.fn(), // Add upsertUser if it's called
-    incrementSnippetViewCount: jest.fn().mockResolvedValue(undefined),
-  },
-}));
-
-// Mock the authMiddleware
-// We will use the actual authMiddleware but mock its dependencies (firebase-admin, storage.getUser)
-// This is a change from the original approach of completely mocking out authMiddleware.
-// This allows us to test the middleware's logic more accurately.
-const originalRoutes = jest.requireActual('../routes');
-jest.mock('../routes', () => {
-  const original = jest.requireActual('../routes');
-  return {
-    ...original,
-    // authMiddleware is NOT mocked here anymore, we use the real one.
-  };
-});
-
-
-// Mock pool for health check
-jest.mock('../db', () => ({
-  pool: {
-    connect: jest.fn().mockResolvedValue({
-      query: jest.fn().mockResolvedValue({ rows: [{ now: new Date().toISOString() }] }),
-      release: jest.fn(),
+vi.mock("firebase-admin", () => ({
+  default: {
+    auth: () => ({
+      verifyIdToken: async (token: string) => {
+        if (typeof token !== "string" || !token.startsWith("token-")) {
+          throw new Error("bad token");
+        }
+        const uid = token.slice("token-".length);
+        return { uid, email: `${uid}@example.test`, name: uid, picture: null };
+      },
     }),
   },
 }));
 
+vi.mock("../logger", () => ({
+  default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
 
-let app: Express;
+vi.mock("../storage", () => {
+  const visible = (s: any, userId?: string) =>
+    s.isPublic === true || (!!userId && s.userId === userId);
+  const storage = {
+    getUser: async (id: string) => state.users.get(id),
+    upsertUser: async (u: any) => {
+      const row = { ...state.users.get(u.id), ...u };
+      state.users.set(u.id, row);
+      return row;
+    },
+    getSnippets: async (f: any = {}) =>
+      [...state.snippets.values()].filter(
+        (s) =>
+          (f.userId === undefined || s.userId === f.userId) &&
+          (f.isPublic === undefined || s.isPublic === f.isPublic)
+      ),
+    getSnippet: async (id: number) => state.snippets.get(id),
+    createSnippet: async (s: any) => {
+      const row = { id: state.nextId++, isPublic: false, isFavorite: false, ...s };
+      state.snippets.set(row.id, row);
+      return row;
+    },
+    updateSnippet: async (id: number, s: any) => {
+      const row = { ...state.snippets.get(id), ...s };
+      state.snippets.set(id, row);
+      return row;
+    },
+    deleteSnippet: async (id: number) => void state.snippets.delete(id),
+    incrementSnippetViewCount: async () => undefined,
+    getLanguages: async (userId?: string) =>
+      [...new Set([...state.snippets.values()].filter((s) => visible(s, userId)).map((s) => s.language))].sort(),
+    getTags: async (userId?: string) =>
+      [...new Set([...state.snippets.values()].filter((s) => visible(s, userId)).flatMap((s) => s.tags ?? []))].sort(),
+    getCollections: async (userId: string) =>
+      [...state.collections.values()].filter((c) => c.userId === userId),
+    getCollection: async (id: number) => state.collections.get(id),
+    getCollectionSnippets: async (collectionId: number) =>
+      state.items
+        .filter((i) => i.collectionId === collectionId)
+        .map((i) => state.snippets.get(i.snippetId))
+        .filter(Boolean),
+    addSnippetToCollection: async (item: any) => {
+      state.items.push(item);
+      return { id: state.nextId++, ...item };
+    },
+    removeSnippetFromCollection: async () => undefined,
+    getComment: async (id: number) => state.comments.get(id),
+    getCommentsBySnippetId: async (snippetId: number) =>
+      [...state.comments.values()].filter((c) => c.snippetId === snippetId),
+    createComment: async (c: any) => {
+      const row = { id: state.nextId++, ...c };
+      state.comments.set(row.id, row);
+      return row;
+    },
+    updateComment: async (id: number, patch: any) => {
+      const row = { ...state.comments.get(id), ...patch };
+      state.comments.set(id, row);
+      return row;
+    },
+    deleteComment: async (id: number) => void state.comments.delete(id),
+  };
+  return { storage };
+});
 
-beforeEach(async () => { // Make beforeEach async if registerRoutes is async
-  app = express();
+import { registerRoutes } from "../routes";
+
+const ALICE = { Authorization: "Bearer token-alice" };
+const BOB = { Authorization: "Bearer token-bob" };
+
+async function makeApp() {
+  const app = express();
   app.use(express.json());
-  // Use originalRoutes.registerRoutes from the actual module
-  await originalRoutes.registerRoutes(app); 
-  
-  // Clear mock history before each test
-  (storage.getSnippets as jest.Mock).mockClear();
-  (storage.getSnippet as jest.Mock).mockClear();
-  (storage.getUser as jest.Mock).mockClear();
-  (storage.incrementSnippetViewCount as jest.Mock).mockClear();
-  // Clear firebase-admin mocks
-  (admin.auth().verifyIdToken as jest.Mock).mockClear();
+  await registerRoutes(app);
+  return app;
+}
+
+beforeEach(() => {
+  state.users.clear();
+  state.snippets.clear();
+  state.collections.clear();
+  state.comments.clear();
+  state.items.length = 0;
+  state.nextId = 100;
+
+  state.users.set("alice", { id: "alice", email: "alice@example.test", displayName: "Alice" });
+  state.users.set("bob", { id: "bob", email: "bob@example.test", displayName: "Bob" });
+
+  // 1: alice private, 2: alice public, 3: bob private
+  state.snippets.set(1, { id: 1, title: "a-private", code: "secret()", language: "python", tags: ["alice-secret-tag"], userId: "alice", isPublic: false });
+  state.snippets.set(2, { id: 2, title: "a-public", code: "hello()", language: "go", tags: ["shared-tag"], userId: "alice", isPublic: true });
+  state.snippets.set(3, { id: 3, title: "b-private", code: "bob()", language: "rust", tags: ["bob-tag"], userId: "bob", isPublic: false });
+
+  state.collections.set(10, { id: 10, name: "alice-col", userId: "alice" });
+  state.collections.set(11, { id: 11, name: "bob-col", userId: "bob" });
+
+  state.comments.set(50, { id: 50, snippetId: 1, userId: "alice", content: "note on private" });
+  state.comments.set(51, { id: 51, snippetId: 2, userId: "bob", content: "nice" });
 });
 
-// Define mock users and snippets
-const user_A_id = 'user_A_id';
-const user_B_id = 'user_B_id';
-const user_C_id = 'user_C_id';
-
-const mockUserA = { id: user_A_id, email: 'a@example.com', displayName: 'User A', photoURL: null, createdAt: new Date(), updatedAt: new Date(), username: 'usera', githubId: null, bio: null, location: null, website: null };
-const mockUserB = { id: user_B_id, email: 'b@example.com', displayName: 'User B', photoURL: null, createdAt: new Date(), updatedAt: new Date(), username: 'userb', githubId: null, bio: null, location: null, website: null };
-const mockUserC = { id: user_C_id, email: 'c@example.com', displayName: 'User C', photoURL: null, createdAt: new Date(), updatedAt: new Date(), username: 'userc', githubId: null, bio: null, location: null, website: null };
-
-
-const snippet1: Partial<Snippet> = { id: 1, title: 'User A Snippet 1', code: 'code1', language: 'js', userId: user_A_id, isPublic: false };
-const snippet2: Partial<Snippet> = { id: 2, title: 'User A Snippet 2', code: 'code2', language: 'ts', userId: user_A_id, isPublic: false };
-const snippet3: Partial<Snippet> = { id: 3, title: 'User B Snippet 1', code: 'code3', language: 'py', userId: user_B_id, isPublic: false };
-const publicSnippet: Partial<Snippet> = { id: 4, title: 'Public Snippet', code: 'public', language: 'md', userId: user_A_id, isPublic: true };
-
-describe('GET /api/snippets (User-Specific)', () => {
-  it('should return 401 if no token is provided', async () => {
-    const response = await request(app).get('/api/snippets');
-    expect(response.status).toBe(401);
-    expect(response.body.message).toContain('Unauthorized');
+describe("POST /api/auth/user (CP-01)", () => {
+  it("rejects a body with uid but no idToken and writes nothing", async () => {
+    const app = await makeApp();
+    const res = await request(app)
+      .post("/api/auth/user")
+      .send({ uid: "alice", email: "attacker@evil.test", displayName: "Mallory" });
+    expect(res.status).toBe(400);
+    expect(state.users.get("alice").email).toBe("alice@example.test");
   });
 
-  it('should return snippets for User A when authenticated as User A', async () => {
-    (admin.auth().verifyIdToken as jest.Mock).mockResolvedValue({ uid: user_A_id });
-    (storage.getUser as jest.Mock).mockResolvedValue(mockUserA);
-    (storage.getSnippets as jest.Mock).mockImplementation(async (filters) => {
-      if (filters.userId === user_A_id) {
-        return [snippet1, snippet2];
-      }
-      return [];
-    });
-
-    const response = await request(app)
-      .get('/api/snippets')
-      .set('Authorization', 'Bearer test-token-user-a');
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual([snippet1, snippet2]);
-    expect(storage.getSnippets).toHaveBeenCalledWith(expect.objectContaining({ userId: user_A_id }));
-    expect(admin.auth().verifyIdToken).toHaveBeenCalledWith('test-token-user-a');
-    expect(storage.getUser).toHaveBeenCalledWith(user_A_id);
+  it("rejects an invalid token with 401", async () => {
+    const app = await makeApp();
+    const res = await request(app).post("/api/auth/user").send({ idToken: "garbage" });
+    expect(res.status).toBe(401);
   });
 
-  it('should return snippets for User B when authenticated as User B', async () => {
-    (admin.auth().verifyIdToken as jest.Mock).mockResolvedValue({ uid: user_B_id });
-    (storage.getUser as jest.Mock).mockResolvedValue(mockUserB);
-    (storage.getSnippets as jest.Mock).mockImplementation(async (filters) => {
-      if (filters.userId === user_B_id) {
-        return [snippet3];
-      }
-      return [];
-    });
-
-    const response = await request(app)
-      .get('/api/snippets')
-      .set('Authorization', 'Bearer test-token-user-b');
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual([snippet3]);
-    expect(storage.getSnippets).toHaveBeenCalledWith(expect.objectContaining({ userId: user_B_id }));
+  it("builds the user from the verified token and ignores extra fields", async () => {
+    const app = await makeApp();
+    const res = await request(app)
+      .post("/api/auth/user")
+      .send({ idToken: "token-carol", uid: "alice", email: "attacker@evil.test" });
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe("carol");
+    expect(res.body.email).toBe("carol@example.test");
+    expect(state.users.get("alice").email).toBe("alice@example.test");
   });
 
-  it('should return an empty array for User C (who has no snippets) when authenticated as User C', async () => {
-    (admin.auth().verifyIdToken as jest.Mock).mockResolvedValue({ uid: user_C_id });
-    (storage.getUser as jest.Mock).mockResolvedValue(mockUserC);
-    (storage.getSnippets as jest.Mock).mockImplementation(async (filters) => {
-      if (filters.userId === user_C_id) {
-        return [];
-      }
-      return [snippet1, snippet2, snippet3]; // Should not happen if filter is correct
-    });
-
-    const response = await request(app)
-      .get('/api/snippets')
-      .set('Authorization', 'Bearer test-token-user-c');
-
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual([]);
-    expect(storage.getSnippets).toHaveBeenCalledWith(expect.objectContaining({ userId: user_C_id }));
-  });
-  
-  it('should return 401 if token is invalid', async () => {
-    (admin.auth().verifyIdToken as jest.Mock).mockRejectedValue(new Error('Invalid token'));
-    
-    const response = await request(app)
-      .get('/api/snippets')
-      .set('Authorization', 'Bearer invalid-token');
-      
-    expect(response.status).toBe(401);
-    expect(response.body.message).toContain('Invalid token');
-  });
-
-  it('should return 404 if user from token is not found in storage', async () => {
-    (admin.auth().verifyIdToken as jest.Mock).mockResolvedValue({ uid: 'nonexistent-user-id' });
-    (storage.getUser as jest.Mock).mockResolvedValue(undefined); // User not found
-    
-    const response = await request(app)
-      .get('/api/snippets')
-      .set('Authorization', 'Bearer token-for-nonexistent-user');
-      
-    expect(response.status).toBe(404);
-    expect(response.body.message).toContain('User not found');
+  it("rejects a non-string idToken", async () => {
+    const app = await makeApp();
+    const res = await request(app).post("/api/auth/user").send({ idToken: { a: 1 } });
+    expect(res.status).toBe(400);
   });
 });
 
-describe('Public API Snippet Routes', () => {
-  describe('GET /api/public/snippets', () => {
-    it('should return a list of public snippets and call storage.getSnippets with isPublic:true', async () => {
-      const mockPublicSnippets: Partial<Snippet>[] = [
-        { id: 1, title: 'Public Snippet 1', isPublic: true, language: 'javascript' },
-        { id: 2, title: 'Public Snippet 2', isPublic: true, language: 'python' },
-      ];
-      (storage.getSnippets as jest.Mock).mockResolvedValue(mockPublicSnippets);
-
-      const response = await request(app).get('/api/public/snippets');
-
-      const mockPublicSnippetsActual: Snippet[] = [ // Use actual Snippet type
-        { id: 1, title: 'Public Snippet 1', isPublic: true, language: 'javascript', code: '', userId: user_A_id, createdAt: new Date(), updatedAt: new Date(), viewCount:0, isFavorite: false, shareId: null, tags: [] },
-        { id: 2, title: 'Public Snippet 2', isPublic: true, language: 'python', code: '', userId: user_B_id, createdAt: new Date(), updatedAt: new Date(), viewCount:0, isFavorite: false, shareId: null, tags: []  },
-      ];
-      (storage.getSnippets as jest.Mock).mockResolvedValue(mockPublicSnippetsActual);
-
-      const response = await request(app).get('/api/public/snippets');
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockPublicSnippetsActual.map(s => ({...s, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt.toISOString() }))); // Adjust for date serialization
-      expect(storage.getSnippets).toHaveBeenCalledWith(expect.objectContaining({
-        isPublic: true,
-      }));
-      // authMiddleware is part of the actual routes, so it WILL be called by Express
-      // but it won't find a token and thus won't authenticate for public routes.
-      // The important thing is that the route handler itself doesn't *require* req.user.
-    });
-
-    it('should pass query parameters (search, language, tag) to storage.getSnippets for public snippets', async () => {
-      (storage.getSnippets as jest.Mock).mockResolvedValue([]);
-      const query = { search: 'public test', language: 'javascript', tag: 'public_example' };
-      
-      await request(app).get('/api/public/snippets').query(query);
-
-      expect(storage.getSnippets).toHaveBeenCalledWith(expect.objectContaining({ // objectContaining for flexibility
-        isPublic: true,
-        search: query.search,
-        language: query.language,
-        tag: query.tag,
-      }));
-    });
-    
-    it('should handle errors from storage.getSnippets gracefully for public snippets', async () => {
-        (storage.getSnippets as jest.Mock).mockRejectedValue(new Error('Storage failure'));
-        
-        const response = await request(app).get('/api/public/snippets');
-        
-        expect(response.status).toBe(500);
-        // Check against the actual error message in your route handler for GET /api/public/snippets
-        expect(response.body).toEqual(expect.objectContaining({ message: 'Failed to get public snippets' }));
-    });
+describe("collections and private snippets (CP-02)", () => {
+  it("refuses to add another user's private snippet to my collection", async () => {
+    const app = await makeApp();
+    const res = await request(app).post("/api/collections/11/snippets/1").set(BOB);
+    expect(res.status).toBe(404);
+    expect(state.items).toHaveLength(0);
   });
 
-  describe('GET /api/public/snippets/:id', () => {
-    it('should return a single public snippet if it exists and isPublic is true', async () => {
-      const mockSnippetActual: Snippet = { id: 1, title: 'Test Snippet', isPublic: true, code: 'code', language: 'js', userId: user_A_id, createdAt: new Date(), updatedAt: new Date(), viewCount:0, isFavorite: false, shareId: null, tags: [] };
-      (storage.getSnippet as jest.Mock).mockResolvedValue(mockSnippetActual);
+  it("allows adding my own private snippet and someone's public snippet", async () => {
+    const app = await makeApp();
+    expect((await request(app).post("/api/collections/11/snippets/3").set(BOB)).status).toBe(201);
+    expect((await request(app).post("/api/collections/11/snippets/2").set(BOB)).status).toBe(201);
+  });
 
-      const response = await request(app).get('/api/public/snippets/1');
+  it("never lists a private snippet of another user, even if an item row exists", async () => {
+    state.items.push({ collectionId: 11, snippetId: 1 }, { collectionId: 11, snippetId: 2 }, { collectionId: 11, snippetId: 3 });
+    const app = await makeApp();
+    const res = await request(app).get("/api/collections/11/snippets").set(BOB);
+    expect(res.status).toBe(200);
+    expect(res.body.map((s: any) => s.id).sort()).toEqual([2, 3]);
+  });
 
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({...mockSnippetActual, createdAt: mockSnippetActual.createdAt.toISOString(), updatedAt: mockSnippetActual.updatedAt.toISOString() });
-      expect(storage.getSnippet).toHaveBeenCalledWith(1);
-      expect(storage.incrementSnippetViewCount).not.toHaveBeenCalled();
-    });
+  it("refuses access to someone else's collection", async () => {
+    const app = await makeApp();
+    expect((await request(app).get("/api/collections/10/snippets").set(BOB)).status).toBe(403);
+    expect((await request(app).post("/api/collections/10/snippets/3").set(BOB)).status).toBe(403);
+  });
+});
 
-    it('should return 404 if public snippet is not found by storage.getSnippet', async () => {
-      (storage.getSnippet as jest.Mock).mockResolvedValue(null); // Snippet not found
+describe("comments (CP-03)", () => {
+  it("hides comments on a private snippet from anonymous callers and other users", async () => {
+    const app = await makeApp();
+    expect((await request(app).get("/api/snippets/1/comments")).status).toBe(404);
+    expect((await request(app).get("/api/snippets/1/comments").set(BOB)).status).toBe(404);
+  });
 
-      const response = await request(app).get('/api/public/snippets/999');
+  it("shows them to the owner, and public snippets' comments to anyone", async () => {
+    const app = await makeApp();
+    const own = await request(app).get("/api/snippets/1/comments").set(ALICE);
+    expect(own.status).toBe(200);
+    expect(own.body).toHaveLength(1);
+    const pub = await request(app).get("/api/snippets/2/comments");
+    expect(pub.status).toBe(200);
+    expect(pub.body).toHaveLength(1);
+  });
 
-      expect(response.status).toBe(404);
-      // Check against the actual error message in your route handler
-      expect(response.body).toEqual({ message: "Snippet not found or not public" });
-    });
+  it("refuses a comment on another user's private snippet", async () => {
+    const app = await makeApp();
+    const res = await request(app).post("/api/snippets/1/comments").set(BOB).send({ content: "hi" });
+    expect(res.status).toBe(404);
+    expect(state.comments.size).toBe(2);
+  });
 
-    it('should return 404 if snippet is found but isPublic is false', async () => {
-      const mockPrivateSnippetActual: Snippet = { id: 2, title: 'Private Snippet', isPublic: false, code: 'private', language: 'js', userId: user_A_id, createdAt: new Date(), updatedAt: new Date(), viewCount:0, isFavorite: false, shareId: null, tags: [] };
-      (storage.getSnippet as jest.Mock).mockResolvedValue(mockPrivateSnippetActual);
+  it("creates a comment on a public snippet as the caller, ignoring a spoofed userId", async () => {
+    const app = await makeApp();
+    const res = await request(app)
+      .post("/api/snippets/2/comments")
+      .set(BOB)
+      .send({ content: "hello", userId: "alice", snippetId: 1 });
+    expect(res.status).toBe(201);
+    expect(res.body.userId).toBe("bob");
+    expect(res.body.snippetId).toBe(2);
+  });
 
-      const response = await request(app).get('/api/public/snippets/2');
+  it("update changes only the content", async () => {
+    const app = await makeApp();
+    const res = await request(app)
+      .put("/api/comments/51")
+      .set(BOB)
+      .send({ content: "edited", snippetId: 1, userId: "alice" });
+    expect(res.status).toBe(200);
+    expect(state.comments.get(51)).toMatchObject({ content: "edited", snippetId: 2, userId: "bob" });
+  });
 
-      expect(response.status).toBe(404);
-      expect(response.body).toEqual({ message: "Snippet not found or not public" });
-    });
-    
-    it('should handle errors from storage.getSnippet gracefully for public snippets', async () => {
-        (storage.getSnippet as jest.Mock).mockRejectedValue(new Error('Storage failure for single snippet'));
-        
-        const response = await request(app).get('/api/public/snippets/1');
-        
-        expect(response.status).toBe(500);
-        // Check against the actual error message in your route handler for GET /api/public/snippets/:id
-        expect(response.body).toEqual(expect.objectContaining({ message: 'Failed to get public snippet' }));
-    });
-    
-    it('should handle invalid ID format (e.g., non-numeric string)', async () => {
-        // Express route matching with `Number(req.params.id)` will pass NaN to `storage.getSnippet`
-        // if the ID is non-numeric. We need to simulate `storage.getSnippet` returning null for NaN.
-        (storage.getSnippet as jest.Mock).mockImplementation(async (id) => {
-            if (isNaN(id)) {
-                return null; 
-            }
-            // Fallback for other ID types if needed, though this test focuses on NaN
-            return null; 
-        });
-        
-        const response = await request(app).get('/api/public/snippets/abc');
-        
-        expect(storage.getSnippet).toHaveBeenCalledWith(NaN);
-        expect(response.status).toBe(404); 
-        expect(response.body).toEqual({ message: "Snippet not found or not public" });
-    });
+  it("update rejects an empty body and other users", async () => {
+    const app = await makeApp();
+    expect((await request(app).put("/api/comments/51").set(BOB).send({ snippetId: 1 })).status).toBe(400);
+    expect((await request(app).put("/api/comments/51").set(ALICE).send({ content: "x" })).status).toBe(403);
+  });
+});
+
+describe("GET /api/snippets/export (CP-04)", () => {
+  it("returns only the caller's snippets, without ids or owner", async () => {
+    const app = await makeApp();
+    const res = await request(app).get("/api/snippets/export").set(ALICE);
+    expect(res.status).toBe(200);
+    expect(res.body.map((s: any) => s.title).sort()).toEqual(["a-private", "a-public"]);
+    expect(res.body[0]).not.toHaveProperty("id");
+    expect(res.body[0]).not.toHaveProperty("userId");
+  });
+
+  it("needs authentication", async () => {
+    const app = await makeApp();
+    expect((await request(app).get("/api/snippets/export")).status).toBe(401);
+  });
+});
+
+describe("snippet visibility", () => {
+  it("create and import keep isPublic (CP-05, route level)", async () => {
+    const app = await makeApp();
+    const created = await request(app)
+      .post("/api/snippets")
+      .set(ALICE)
+      .send({ title: "t", code: "c", isPublic: true });
+    expect(created.status).toBe(201);
+    expect(created.body.isPublic).toBe(true);
+  });
+
+  it("a private snippet is 404 for others and for anonymous callers", async () => {
+    const app = await makeApp();
+    expect((await request(app).get("/api/snippets/1")).status).toBe(404);
+    expect((await request(app).get("/api/snippets/1").set(BOB)).status).toBe(404);
+    expect((await request(app).get("/api/snippets/1").set(ALICE)).status).toBe(200);
+    expect((await request(app).get("/api/public/snippets/1")).status).toBe(404);
+  });
+
+  it("other users cannot edit or delete my snippet", async () => {
+    const app = await makeApp();
+    expect((await request(app).delete("/api/snippets/1").set(BOB)).status).toBe(403);
+    expect(
+      (await request(app).put("/api/snippets/1").set(BOB).send({ title: "x", code: "y", language: "js" })).status
+    ).toBe(403);
+    expect(state.snippets.get(1).title).toBe("a-private");
+  });
+});
+
+describe("tags and languages (CP-06)", () => {
+  it("anonymous callers see only public snippets' tags and languages", async () => {
+    const app = await makeApp();
+    expect((await request(app).get("/api/tags")).body).toEqual(["shared-tag"]);
+    expect((await request(app).get("/api/languages")).body).toEqual(["go"]);
+  });
+
+  it("a signed-in user also sees their own, but not other users' private ones", async () => {
+    const app = await makeApp();
+    expect((await request(app).get("/api/tags").set(BOB)).body).toEqual(["bob-tag", "shared-tag"]);
+    expect((await request(app).get("/api/languages").set(ALICE)).body).toEqual(["go", "python"]);
+  });
+});
+
+describe("id and query validation (CP-08, CP-09)", () => {
+  it.each(["abc", "1.5", "0", "-1", "99999999999", "${}"])("answers 400 for id %s", async (bad) => {
+    const app = await makeApp();
+    const res = await request(app).get(`/api/snippets/${encodeURIComponent(bad)}`);
+    expect(res.status).toBe(400);
+  });
+
+  it("answers 400 for bad ids on nested routes", async () => {
+    const app = await makeApp();
+    expect((await request(app).get("/api/snippets/abc/comments")).status).toBe(400);
+    expect((await request(app).post("/api/collections/x/snippets/1").set(BOB)).status).toBe(400);
+    expect((await request(app).put("/api/comments/nope").set(BOB).send({ content: "x" })).status).toBe(400);
+  });
+
+  it("ignores object-shaped query filters instead of failing", async () => {
+    const app = await makeApp();
+    const res = await request(app).get("/api/public/snippets?language[a]=b&tag[x]=y");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+  });
+
+  it("unknown API paths are a JSON 404", async () => {
+    const app = await makeApp();
+    const res = await request(app).get("/api/nope");
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ message: "Not found" });
   });
 });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -77,9 +78,9 @@ export default function SimpleAdvancedSearch({
   useEffect(() => {
     async function fetchLanguages() {
       try {
-        const response = await fetch('/api/languages');
-        if (!response.ok) throw new Error('Failed to fetch languages');
-        const data = await response.json();
+        // apiRequest sends the bearer token, so the list includes the
+        // signed-in user's own languages and not only public ones.
+        const data = await apiRequest<string[]>('GET', '/api/languages');
         
         // Convert to filter options format
         const languageOptions = data.map((lang: string) => ({
@@ -102,9 +103,7 @@ export default function SimpleAdvancedSearch({
   useEffect(() => {
     async function fetchTags() {
       try {
-        const response = await fetch('/api/tags');
-        if (!response.ok) throw new Error('Failed to fetch tags');
-        const data = await response.json();
+        const data = await apiRequest<string[]>('GET', '/api/tags');
         
         // Convert to filter options format
         const tagOptions = data.map((tag: string) => ({

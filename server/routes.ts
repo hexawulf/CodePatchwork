@@ -10,6 +10,7 @@ import {
   insertCommentSchema,
 } from "@shared/schema";
 import { z } from "zod";
+import type { Snippet, User } from "@shared/schema";
 
 /** Auth middleware — verifies Firebase ID Token from Authorization header */
 export const authMiddleware: RequestHandler = async (req, res, next) => {
@@ -51,16 +52,51 @@ const optionalAuthMiddleware: RequestHandler = async (req, res, next) => {
 };
 
 /** Helper: parse and validate numeric ID from params */
-function parseId(raw: string): number {
+const MAX_ID = 2147483647; // Postgres serial
+
+export function isValidId(raw: string): boolean {
+  if (!/^[0-9]{1,10}$/.test(raw)) return false;
   const id = Number(raw);
-  if (!Number.isFinite(id) || id < 1) {
+  return id >= 1 && id <= MAX_ID;
+}
+
+function parseId(raw: string): number {
+  if (!isValidId(raw)) {
     throw new Error("Invalid ID");
   }
-  return id;
+  return Number(raw);
 }
+
+/** A query value is used only when it is a string or a list of strings. */
+function queryStrings(value: unknown): string | string[] | undefined {
+  if (typeof value === "string") return value || undefined;
+  if (Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === "string")) {
+    return value as string[];
+  }
+  return undefined;
+}
+
+/** Owner always; anyone else only when the snippet is public. */
+function canViewSnippet(snippet: Snippet, user: User | undefined): boolean {
+  return snippet.isPublic === true || (!!user && snippet.userId === user.id);
+}
+
+const updateCommentSchema = z.object({
+  content: z.string().trim().min(1).max(10000),
+});
 
 /** Register all routes */
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  // Malformed numeric ids are a client error, not a server error.
+  for (const name of ["id", "snippetId", "collectionId"]) {
+    app.param(name, (_req, res, next, value) => {
+      if (!isValidId(String(value))) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+      next();
+    });
+  }
 
   // ─── Health / Test ────────────────────────────────────────────
   app.get("/api/test", (_req, res) => {
@@ -93,38 +129,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── Auth endpoints ───────────────────────────────────────────
 
   app.post("/api/auth/user", async (req: Request, res: Response) => {
-    const { idToken, uid, email, displayName, photoURL } = req.body;
+    // The user row is built only from a verified Firebase ID token. Fields
+    // sent alongside it (uid, email, ...) are ignored.
+    const idToken = req.body?.idToken;
 
-    if (!idToken && !uid) {
-      return res.status(400).json({ message: "Missing idToken or uid in request body" });
+    if (typeof idToken !== "string" || idToken === "") {
+      return res.status(400).json({ message: "Missing idToken in request body" });
+    }
+
+    let decoded: Awaited<ReturnType<ReturnType<typeof admin.auth>["verifyIdToken"]>>;
+    try {
+      decoded = await admin.auth().verifyIdToken(idToken);
+    } catch (err: any) {
+      logger.error("/api/auth/user token error:", err.message);
+      return res.status(401).json({ message: "Unauthorized: Invalid token" });
     }
 
     try {
-      let userRecord: {
-        id: string;
-        email: string | null;
-        displayName: string | null;
-        photoURL: string | null;
-      };
-
-      if (idToken) {
-        const decoded = await admin.auth().verifyIdToken(idToken);
-        userRecord = {
-          id: decoded.uid,
-          email: decoded.email ?? null,
-          displayName: decoded.name ?? null,
-          photoURL: decoded.picture ?? null,
-        };
-      } else {
-        userRecord = {
-          id: uid,
-          email: email ?? null,
-          displayName: displayName ?? null,
-          photoURL: photoURL ?? null,
-        };
-      }
-
-      const user = await storage.upsertUser(userRecord);
+      const user = await storage.upsertUser({
+        id: decoded.uid,
+        email: decoded.email ?? null,
+        displayName: decoded.name ?? null,
+        photoURL: decoded.picture ?? null,
+      });
       return res.status(201).json(user);
     } catch (err: any) {
       logger.error("/api/auth/user error:", err.message);
@@ -142,9 +169,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req as any).user.id;
       const filters: any = { userId };
-      if (req.query.search) filters.search = String(req.query.search);
-      if (req.query.language) filters.language = req.query.language;
-      if (req.query.tag) filters.tag = req.query.tag;
+      if (typeof req.query.search === "string" && req.query.search) filters.search = req.query.search;
+      const language = queryStrings(req.query.language);
+      if (language) filters.language = language;
+      const tag = queryStrings(req.query.tag);
+      if (tag) filters.tag = tag;
       if (req.query.favorites === "true") filters.favorites = true;
 
       const list = await storage.getSnippets(filters);
@@ -152,6 +181,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       logger.error("GET /api/snippets error:", err.message);
       res.status(500).json({ message: "Failed to get snippets" });
+    }
+  });
+
+  // Registered before /api/snippets/:id so "export" is not read as an id.
+  app.get("/api/snippets/export", authMiddleware, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const list = await storage.getSnippets({ userId });
+      res.json(
+        list.map((s) => ({
+          title: s.title,
+          description: s.description,
+          code: s.code,
+          language: s.language,
+          tags: s.tags ?? [],
+          isFavorite: s.isFavorite === true,
+          isPublic: s.isPublic === true,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        }))
+      );
+    } catch (err: any) {
+      logger.error("GET /api/snippets/export error:", err.message);
+      res.status(500).json({ message: "Failed to export snippets" });
     }
   });
 
@@ -243,9 +296,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/public/snippets", async (req, res) => {
     try {
       const filters: any = { isPublic: true };
-      if (req.query.search) filters.search = String(req.query.search);
-      if (req.query.language) filters.language = req.query.language;
-      if (req.query.tag) filters.tag = req.query.tag;
+      if (typeof req.query.search === "string" && req.query.search) filters.search = req.query.search;
+      const language = queryStrings(req.query.language);
+      if (language) filters.language = language;
+      const tag = queryStrings(req.query.tag);
+      if (tag) filters.tag = tag;
       const snippets = await storage.getSnippets(filters);
       res.json(snippets);
     } catch (err: any) {
@@ -334,9 +389,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── Languages & Tags ────────────────────────────────────────
 
-  app.get("/api/languages", async (_req, res) => {
+  // Public snippets for everyone, plus the caller's own when signed in.
+  app.get("/api/languages", optionalAuthMiddleware, async (req, res) => {
     try {
-      const langs = await storage.getLanguages();
+      const langs = await storage.getLanguages((req as any).user?.id);
       res.json(langs);
     } catch (err: any) {
       logger.error("GET /api/languages error:", err.message);
@@ -344,9 +400,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/tags", async (_req, res) => {
+  app.get("/api/tags", optionalAuthMiddleware, async (req, res) => {
     try {
-      const tags = await storage.getTags();
+      const tags = await storage.getTags((req as any).user?.id);
       res.json(tags);
     } catch (err: any) {
       logger.error("GET /api/tags error:", err.message);
@@ -390,8 +446,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (col.userId !== (req as any).user.id) {
         return res.status(403).json({ message: "Forbidden" });
       }
+      const user = (req as any).user as User;
       const list = await storage.getCollectionSnippets(id);
-      res.json(list);
+      // A snippet that is not the caller's and not public is never returned,
+      // even if an item row points at it.
+      res.json(list.filter((s) => canViewSnippet(s, user)));
     } catch (err: any) {
       logger.error("GET /api/collections/:id/snippets error:", err.message);
       res.status(500).json({ message: "Failed to fetch collection snippets" });
@@ -462,6 +521,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!existing) return res.status(404).json({ message: "Not found" });
         if (existing.userId !== (req as any).user.id) {
           return res.status(403).json({ message: "Forbidden" });
+        }
+        const snippet = await storage.getSnippet(snippetId);
+        if (!snippet || !canViewSnippet(snippet, (req as any).user)) {
+          return res.status(404).json({ message: "Snippet not found" });
         }
         const dto = insertCollectionItemSchema.parse({ collectionId, snippetId });
         const created = await storage.addSnippetToCollection(dto);
@@ -548,9 +611,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── Comments ─────────────────────────────────────────────────
 
-  app.get("/api/snippets/:snippetId/comments", async (req, res) => {
+  app.get("/api/snippets/:snippetId/comments", optionalAuthMiddleware, async (req, res) => {
     try {
       const snippetId = parseId(req.params.snippetId);
+      const snippet = await storage.getSnippet(snippetId);
+      if (!snippet || !canViewSnippet(snippet, (req as any).user)) {
+        return res.status(404).json({ message: "Snippet not found" });
+      }
       const comments = await storage.getCommentsBySnippetId(snippetId);
       res.json(comments);
     } catch (err: any) {
@@ -562,6 +629,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/snippets/:snippetId/comments", authMiddleware, async (req, res) => {
     try {
       const snippetId = parseId(req.params.snippetId);
+      const snippet = await storage.getSnippet(snippetId);
+      if (!snippet || !canViewSnippet(snippet, (req as any).user)) {
+        return res.status(404).json({ message: "Snippet not found" });
+      }
       const dto = insertCommentSchema.parse({
         ...req.body,
         snippetId,
@@ -586,9 +657,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (comment.userId !== (req as any).user.id) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      const updated = await storage.updateComment(id, req.body);
+      // Only the text may change; snippetId and userId are fixed at creation.
+      const { content } = updateCommentSchema.parse(req.body);
+      const updated = await storage.updateComment(id, { content });
       res.json(updated);
     } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: err.errors });
+      }
       logger.error("PUT /api/comments/:id error:", err.message);
       res.status(500).json({ message: "Failed to update comment" });
     }

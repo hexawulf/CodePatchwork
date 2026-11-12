@@ -17,6 +17,8 @@ import ImportExportDialog from "./ImportExportDialog";
 import GlobalCodeThemeSelector from "./GlobalCodeThemeSelector";
 import AboutModal from "./AboutModal";
 import { useSnippetContext } from "@/contexts/SnippetContext";
+import { downloadSnippetsExport } from "@/lib/exportSnippets";
+import { useToast } from "@/hooks/use-toast";
 
 interface HeaderProps {
   toggleMobileMenu?: () => void;
@@ -28,6 +30,20 @@ const Header = ({ toggleMobileMenu }: HeaderProps = {}) => {
   
   // Theme context
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
+
+  const handleExport = async () => {
+    try {
+      const count = await downloadSnippetsExport();
+      toast({ title: "Snippets exported", description: `${count} snippets saved to a JSON file.` });
+    } catch (err: any) {
+      toast({
+        title: "Export failed",
+        description: err?.message || "Could not export snippets.",
+        variant: "destructive",
+      });
+    }
+  };
   
   // Snippet context
   const { openCreateModal } = useSnippetContext();
@@ -148,7 +164,7 @@ const Header = ({ toggleMobileMenu }: HeaderProps = {}) => {
                   <Upload className="h-4 w-4 mr-2" />
                   Import Snippets
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.location.href = "/api/snippets/export"}>
+                <DropdownMenuItem onClick={handleExport}>
                   <Download className="h-4 w-4 mr-2" />
                   Export Snippets
                 </DropdownMenuItem>
