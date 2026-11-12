@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { type Snippet, type InsertSnippet } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 interface SnippetContextType {
   isCreateModalOpen: boolean;
@@ -36,11 +37,13 @@ export function SnippetProvider({ children }: { children: ReactNode }) {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuthContext();
   
   // Fetch snippets to make available in context
   const { data: snippets = [] } = useQuery<Snippet[]>({
     queryKey: ["/api/snippets"],
-    retry: 1
+    enabled: !!user,
+    retry: false
   });
 
   // Create snippet mutation
