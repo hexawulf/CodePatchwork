@@ -1,228 +1,147 @@
-# CodePatchwork 🧩
-<div align="center">
+# CodePatchwork
 
-[![GitHub stars](https://img.shields.io/github/stars/hexawulf/CodePatchwork?style=social)](https://github.com/hexawulf/CodePatchwork/stargazers)
-[![Live Demo](https://img.shields.io/badge/🚀_Demo-Live-success?style=flat-square)](https://www.codepatchwork.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Live](https://img.shields.io/badge/Live-codepatchwork.com-2563eb?style=flat-square)](https://codepatchwork.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](package.json)
+[![CI](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml/badge.svg)](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml)
 
-**Transform your scattered code snippets into a beautiful, searchable visual library**
+A full-stack visual code snippet manager with syntax highlighting, multi-filter search, collections, JSON import/export, and public sharing links.
 
-*A visual code snippet manager that combines the visual appeal of Pinterest with the functionality of GitHub Gists.*
+**Live instance:** [https://codepatchwork.com](https://codepatchwork.com)
 
 ![CodePatchwork Banner](codepatchwork-banner.png)
 
-</div>
+## Features
 
-## 🌟 **Try CodePatchwork Live!**
+- **Snippet Library & Views** — Organize snippets in grid or list layouts with sorting (recent, oldest, most used, A–Z / Z–A) and favorite toggling.
+- **Syntax Highlighting** — Powered by `prism-react-renderer` with 25 editor languages and 5 switchable syntax themes (Night Owl, Dracula, GitHub, VS Dark, VS Light).
+- **Search & Filtering** — Full-text search across titles and code plus multi-select language, tag, and favorites filtering backed by PostgreSQL queries.
+- **Collections** — Group owned and public snippets into named collections.
+- **Public Sharing & Comments** — Toggle snippet visibility between private and public, generate random URL-safe share links (`/shared/:shareId`), and post comments on accessible snippets.
+- **JSON Import & Export** — Bulk-import snippets from JSON and export your library as a portable JSON file.
+- **Authentication & Isolation** — Google Sign-In via Firebase Authentication with server-side Firebase Admin ID token verification, strict per-user ownership checks, Helmet CSP headers, and PostgreSQL persistence via Drizzle ORM.
+- **Light / Dark / System Theme** — Persistent UI appearance preference alongside global code theme selection.
 
-<div align="center">
+## Tech Stack
 
-### **👉 [🚀 EXPERIENCE THE DEMO](https://www.codepatchwork.com) 👈**
+| Layer | Stack |
+|---|---|
+| Frontend | React 18, TypeScript, Vite 6, Tailwind CSS 3, Radix UI, Wouter, TanStack Query 5, `prism-react-renderer` |
+| Backend | Node.js (ESM), Express 4, Helmet, Winston, Zod |
+| Database | PostgreSQL, Drizzle ORM, `drizzle-zod`, `pg` |
+| Auth | Firebase Authentication (client) + Firebase Admin SDK (server token verification) |
+| Testing | Vitest 4, Supertest |
 
-*See CodePatchwork in action - no installation required!*
+## Architecture
 
-[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-CodePatchwork.com-blue?style=for-the-badge&logoColor=white)](https://www.codepatchwork.com)
+```text
+├── client/
+│   ├── index.html
+│   └── src/
+│       ├── components/        # Header, Sidebar, SnippetCard, dialogs, Radix UI primitives
+│       ├── contexts/          # Auth, Theme, CodeTheme, Snippet, Collection providers
+│       ├── hooks/             # useSnippets, use-copy-to-clipboard, use-toast
+│       ├── lib/               # queryClient, firebase, constants, snippets, utils + __tests__/
+│       └── pages/             # Home, PublicHome, Snippets, Collections, CollectionDetail, Tags, Settings, SharedSnippet
+├── public/                    # Favicons and static web assets
+├── server/
+│   ├── index.ts               # Express bootstrap, Firebase Admin init, Helmet CSP, graceful shutdown
+│   ├── db.ts                  # PostgreSQL Pool + Drizzle instance
+│   ├── logger.ts              # Winston console + file logger (LOG_DIR configurable)
+│   ├── storage.ts             # DatabaseStorage (transactional deletes, escaped ILIKE, array filters)
+│   ├── vite.ts                # Dev Vite middleware & prod static serving
+│   ├── middleware/auth.ts     # Firebase bearer token verification (required + optional)
+│   ├── routes.ts              # Param validation, health/test endpoints, route registration
+│   ├── routes/                # auth.ts, snippets.ts, collections.ts, comments.ts, helpers.ts
+│   └── __tests__/             # Route and storage test suites
+└── shared/
+    └── schema.ts              # Drizzle PostgreSQL schema + shared TypeScript types
+```
 
-</div>
+## API Overview
 
----
+| Group | Endpoints |
+|---|---|
+| Health | `GET /api/health`, `GET /api/test` |
+| Auth | `POST /api/auth/user`, `GET /api/auth/me` |
+| Snippets | `GET/POST /api/snippets`, `GET/PUT/DELETE /api/snippets/:id`, `POST /api/snippets/:id/favorite`, `POST /api/snippets/:id/share`, `POST /api/snippets/:id/publish`, `GET /api/snippets/export`, `POST /api/snippets/import` |
+| Public & Metadata | `GET /api/public/snippets`, `GET /api/public/snippets/:id`, `GET /api/shared/:shareId`, `GET /api/languages`, `GET /api/tags` |
+| Collections | `GET/POST /api/collections`, `GET/PUT/DELETE /api/collections/:id`, `GET /api/collections/:id/snippets`, `POST/DELETE /api/collections/:collectionId/snippets/:snippetId` |
+| Comments | `GET/POST /api/snippets/:snippetId/comments`, `PUT/DELETE /api/comments/:id` |
 
-## 📋 Table of Contents
-- [🌟 Live Demo](#-try-codepatchwork-live)
-- [✨ Features](#-features)
-- [🚀 Getting Started](#-getting-started)
-- [🔧 Usage](#-usage)
-- [🛠️ Technologies](#️-technologies-used)
-- [🤝 Contributing](#-contributing)
-
-## ⚡ Quick Start
-
-Want to jump right in? **[Try the live demo](https://www.codepatchwork.com)** - no installation needed!
-
-For local development, you'll need Node.js 18+ and PostgreSQL. See detailed setup below ⬇️
-
-## ✨ Features
-
-### 🎨 **Visual Experience**
-- **Pinterest-Style Interface** - Visually appealing snippet organization
-- **Syntax Highlighting** - Beautiful code display for 100+ languages
-- **Dark/Light Themes** - Customizable visual experience
-- **Responsive Design** - Perfect on desktop, tablet, and mobile
-
-### 🔍 **Organization & Discovery**
-- **Smart Search & Filtering** - Find snippets by language, tags, or content
-- **Custom Collections** - Organize snippets into themed groups
-- **Tags & Metadata** - Rich categorization and discovery
-- **Import/Export** - Easy backup and migration
-
-### 🤝 **Collaboration & Sharing**
-- **Public Sharing** - Share snippets with customizable links
-- **Comment System** - Collaborate and discuss code
-- **Secure Authentication** - Google OAuth or email/password
-
-## 📸 Screenshots
-
-![Main Interface](screenshots/main-interface.png)
-*Beautiful Pinterest-style code snippet organization*
-
-![Dark Mode](screenshots/dark-mode.png)
-*Elegant dark theme for comfortable coding*
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18+)
-- PostgreSQL database
-- Firebase project (for authentication)
+- Node.js 20+
+- PostgreSQL
+- A Firebase project with Google Sign-In enabled and a Firebase Admin service account JSON file
 
-### Installation
+### Local Setup
 
-1. Clone the repository:
+1. Clone and install dependencies:
    ```bash
-   git clone https://github.com/hexawolf/CodePatchwork.git
+   git clone https://github.com/hexawulf/CodePatchwork.git
    cd CodePatchwork
+   npm ci
    ```
 
-2. Install dependencies:
-   ```bash
-   npm install
+2. Create a `.env` file (see `.env.example`):
+   ```env
+   PORT=3001
+   DATABASE_URL=postgresql://username:password@localhost:5432/codepatchwork
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
+   LOG_DIR=./logs
+
+   VITE_FIREBASE_API_KEY=...
+   VITE_FIREBASE_AUTH_DOMAIN=...
+   VITE_FIREBASE_PROJECT_ID=...
+   VITE_FIREBASE_STORAGE_BUCKET=...
+   VITE_FIREBASE_MESSAGING_SENDER_ID=...
+   VITE_FIREBASE_APP_ID=...
    ```
 
-3. Create a `.env` file in the root directory with the following variables:
-   ```
-   # PostgreSQL Database
-   DATABASE_URL=postgres://username:password@localhost:5432/codepatchwork
-   
-   # Firebase Configuration
-   VITE_FIREBASE_API_KEY=your-api-key
-   VITE_FIREBASE_PROJECT_ID=your-project-id
-   VITE_FIREBASE_APP_ID=your-app-id
-   ```
-
-4. Set up Firebase for authentication:
-   - Create a Firebase project at [firebase.google.com](https://firebase.google.com/)
-   - Enable Authentication with Google and Email/Password providers
-   - Add your domain to Authorized Domains in Firebase Console (Authentication > Settings)
-   - Copy your Firebase configuration values to the `.env` file
-
-5. Set up the database:
+3. Push the Drizzle schema to PostgreSQL:
    ```bash
    npm run db:push
    ```
 
-6. Start the development server:
+4. Start the development server:
    ```bash
    npm run dev
    ```
 
-## 🔧 Usage
+## Scripts
 
-### Adding a Snippet
+| Command | Description |
+|---|---|
+| `npm run dev` | Run Express + Vite dev middleware on `PORT` (default `3001`) |
+| `npm run check` | TypeScript strict type-check (`tsc`) |
+| `npm test` | Run Vitest unit and route test suites (`server/` + `client/src/`) |
+| `npm run test:watch` | Run Vitest in watch mode |
+| `npm run build` | Build client (`dist/public/`) with Vite and bundle server (`dist/index.js`) with esbuild |
+| `npm start` | Run the production bundle (`dist/index.js`) |
+| `npm run db:push` | Push `shared/schema.ts` to PostgreSQL via `drizzle-kit` |
 
-1. Click the "+" button in the navigation bar
-2. Enter the snippet title, code, and select the language
-3. Add optional tags and description
-4. Click "Save" to add the snippet to your collection
+## Production Deployment
 
-### Creating Collections
+Production builds output a single bundled Express entrypoint (`dist/index.js`) serving the compiled static SPA from `dist/public/`. PM2 configuration is provided in `ecosystem.config.cjs`:
 
-1. Navigate to the Collections page
-2. Click "Create Collection"
-3. Name your collection and add an optional description
-4. Add snippets to your collection from the snippet context menu
-
-### Searching Snippets
-
-1. Use the search bar at the top of the page
-2. Filter by language, tags, or full-text search
-3. Toggle between grid and list views for different visualization options
-
-### Sharing Snippets
-
-1. Click the "Share" button on any snippet
-2. Toggle the "Public" switch to make the snippet publicly accessible
-3. Copy the generated link to share with others
-
-## 🛠️ Technologies Used
-
-- **Frontend**:
-  - React.js 18 (Functional components & hooks)
-  - TypeScript
-  - TailwindCSS (with light/dark mode)
-  - Vite (for fast development & builds)
-  - Shadcn UI (for accessible UI components)
-  - Prism.js (for code syntax highlighting)
-  - TanStack Query (for data fetching)
-  - Zod (for validation)
-
-- **Backend**:
-  - Node.js
-  - Express.js
-  - PostgreSQL (for data storage)
-  - Drizzle ORM (for type-safe database queries)
-  - Firebase Authentication (for user management)
-
-## 🧪 Development
-
-### Project Structure
-
-```
-├── client/             # Frontend React application
-│   ├── public/         # Static assets
-│   └── src/            # React source code
-│       ├── components/ # UI components
-│       ├── contexts/   # React contexts
-│       ├── hooks/      # Custom React hooks
-│       ├── lib/        # Utilities and constants
-│       └── pages/      # Application pages
-├── server/             # Backend Express server
-│   ├── index.ts        # Server entry point
-│   ├── routes.ts       # API routes
-│   ├── storage.ts      # Database operations
-│   └── vite.ts         # Vite development server setup
-└── shared/             # Shared code between client and server
-    └── schema.ts       # Database schema and types
+```bash
+npm ci
+npm run check
+npm test
+npm run build
+pm2 reload codepatchwork --update-env
 ```
 
-### Available Scripts
+## Contributing
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run test:logger` - Verify Winston file logging in `dist`
-- `npm run db:push` - Push schema changes to database
-- `npm run db:studio` - Open Drizzle Studio to manage database
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-### Quick Logger Test
+## Developer
 
-After running `npm run build`, execute `npm run test:logger` to verify that
-`/home/zk/logs/codepatchwork.log` is created. The test script writes a few
-messages using the bundled logger to ensure file logging works in production.
+Erling Wulf Weinreich (0xWulf) · [dev@0xwulf.dev](mailto:dev@0xwulf.dev)
 
-## 📝 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to this project.
-
-## 📧 Contact
-
-For questions or support, please open an issue on the GitHub repository.
-
-## 🌟 **Ready to Transform Your Code Snippets?**
-
-<div align="center">
-
-### **[🚀 Try CodePatchwork Now](https://www.codepatchwork.com)**
-
-[![Star this repo](https://img.shields.io/badge/⭐_Star_this_repo-black?style=for-the-badge&logo=github)](https://github.com/hexawulf/CodePatchwork)
-[![Report Bug](https://img.shields.io/badge/🐛_Report_Bug-red?style=for-the-badge)](https://github.com/hexawulf/CodePatchwork/issues)
-[![Request Feature](https://img.shields.io/badge/💡_Request_Feature-blue?style=for-the-badge)](https://github.com/hexawulf/CodePatchwork/issues)
-
-</div>
-
----
-
-Made with ❤️ by [hexawulf](https://github.com/hexawulf)
+MIT

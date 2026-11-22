@@ -15,12 +15,6 @@ interface AboutModalProps {
 }
 
 export default function AboutModal({ open, onOpenChange }: AboutModalProps) {
-  const today = new Date().toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
@@ -34,9 +28,9 @@ export default function AboutModal({ open, onOpenChange }: AboutModalProps) {
         <section className="space-y-6 py-4 text-sm">
           <Fragment>
             <h2 className="text-xl font-semibold text-center text-primary">
-              CodePatchwork v1.0.0
+              CodePatchwork v1.1.0
             </h2>
-            <p className="text-center text-muted-foreground">Released {today}</p>
+            <p className="text-center text-muted-foreground">Released November 2026</p>
           </Fragment>
 
           <Fragment>
