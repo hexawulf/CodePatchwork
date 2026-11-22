@@ -67,10 +67,17 @@ export default function AboutModal({ open, onOpenChange }: AboutModalProps) {
           </Fragment>
 
           <Fragment>
-            <h3 className="text-lg font-semibold text-center">Contact</h3>
+            <h3 className="text-lg font-semibold text-center">Developer</h3>
             <div className="flex flex-col items-center gap-1">
-              <span>Author  0xWulf</span>
-              <span>Email  dev@0xwulf.dev</span>
+              <span>
+                Erling Wulf Weinreich (0xWulf) ·{" "}
+                <a
+                  href="mailto:dev@0xwulf.dev"
+                  className="text-blue-500 hover:underline"
+                >
+                  dev@0xwulf.dev
+                </a>
+              </span>
               <a
                 href="https://github.com/hexawulf/CodePatchwork"
                 target="_blank"
