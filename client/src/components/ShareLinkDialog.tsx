@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import {
   Dialog,
   DialogContent,
@@ -22,28 +21,12 @@ export default function ShareLinkDialog({
   onOpenChange,
   shareUrl,
 }: ShareLinkDialogProps) {
-  const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      toast({
-        title: "Link copied!",
-        description: "Share link copied to clipboard.",
-      });
-      
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error("Failed to copy:", error);
-      toast({
-        title: "Copy failed",
-        description: "Please select and copy the link manually.",
-        variant: "destructive",
-      });
-    }
-  };
+  const { isCopying: copied, copy } = useCopyToClipboard({
+    successTitle: "Link copied!",
+    successDescription: "Share link copied to clipboard.",
+    errorDescription: "Please select and copy the link manually.",
+    resetMs: 2000,
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -51,7 +34,7 @@ export default function ShareLinkDialog({
         <DialogHeader>
           <DialogTitle>Share code snippet</DialogTitle>
           <DialogDescription>
-            Anyone with this link will be able to view this snippet if it's set to public.
+            Anyone with this link will be able to view this snippet if it&apos;s set to public.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center space-x-2 mt-4">
@@ -64,10 +47,10 @@ export default function ShareLinkDialog({
               onClick={(e) => (e.target as HTMLInputElement).select()}
             />
           </div>
-          <Button 
-            type="button" 
-            size="icon" 
-            onClick={handleCopy}
+          <Button
+            type="button"
+            size="icon"
+            onClick={() => copy(shareUrl)}
             variant="outline"
             disabled={copied}
           >

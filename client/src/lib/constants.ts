@@ -23,19 +23,34 @@ export const LANGUAGES = [
   { value: "bash", label: "Bash/Shell" },
   { value: "powershell", label: "PowerShell" },
   { value: "docker", label: "Dockerfile" },
-  { value: "graphql", label: "GraphQL" }
-];
+  { value: "graphql", label: "GraphQL" },
+] as const;
+
+export const LANGUAGE_COLORS: Record<string, string> = {
+  javascript: "#F7DF1E",
+  typescript: "#3178C6",
+  python: "#3572A5",
+  java: "#B07219",
+  go: "#00ADD8",
+  css: "#563D7C",
+  html: "#E34F26",
+  jsx: "#61DAFB",
+  tsx: "#61DAFB",
+  sql: "#e38c00",
+  bash: "#4EAA25",
+};
+
+export function getLanguageColor(language?: string | null): string {
+  if (!language) return "#718096";
+  return LANGUAGE_COLORS[language.toLowerCase()] || "#718096";
+}
 
 export const SORT_OPTIONS = [
   { value: "recent", label: "Recently Added" },
   { value: "oldest", label: "Oldest First" },
   { value: "views", label: "Most Used" },
   { value: "az", label: "A-Z" },
-  { value: "za", label: "Z-A" }
-];
+  { value: "za", label: "Z-A" },
+] as const;
 
-export const THEME_OPTIONS = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "System" }
-];
+export type SortOrder = (typeof SORT_OPTIONS)[number]["value"];

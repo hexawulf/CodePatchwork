@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -6,13 +6,27 @@ import {
 } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 
-interface AppUser {
+export interface AppUser {
   id: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+async function syncBackendUser(idToken: string): Promise<AppUser | null> {
+  const res = await fetch("/api/auth/user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+
+  if (!res.ok) {
+    console.error("[useAuth] /api/auth/user failed:", res.status);
+    return null;
+  }
+  return (await res.json()) as AppUser;
 }
 
 export function useAuth() {
@@ -24,19 +38,7 @@ export function useAuth() {
       if (fbUser) {
         try {
           const idToken = await fbUser.getIdToken(true);
-          const res = await fetch("/api/auth/user", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken }),
-          });
-
-          if (res.ok) {
-            const appUser: AppUser = await res.json();
-            setUser(appUser);
-          } else {
-            console.error("[useAuth] /api/auth/user failed:", res.status);
-            setUser(null);
-          }
+          setUser(await syncBackendUser(idToken));
         } catch (e) {
           console.error("[useAuth] error during auth flow:", e);
           setUser(null);
@@ -50,33 +52,21 @@ export function useAuth() {
     return () => unsubscribe();
   }, []);
 
-  const signIn = async () => {
+  const signIn = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const idToken = await result.user.getIdToken();
-      const res = await fetch("/api/auth/user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
-      });
-
-      if (res.ok) {
-        const appUser: AppUser = await res.json();
-        setUser(appUser);
+      // onAuthStateChanged handles syncing the signed-in user with /api/auth/user
+      await signInWithPopup(auth, googleProvider);
+    } catch (err: unknown) {
+      const fbErr = err as { code?: string; message?: string };
+      if (fbErr.code !== "auth/popup-closed-by-user") {
+        console.error("[useAuth] signIn error:", fbErr.code, fbErr.message);
       }
-    } catch (err: any) {
-      if (err.code === "auth/popup-closed-by-user") {
-        // Normal flow, user cancelled
-      } else {
-        console.error("[useAuth] signIn error:", err.code, err.message);
-      }
-    } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
@@ -86,7 +76,7 @@ export function useAuth() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   return { user, loading, signIn, signOut, isAuthenticated: !!user };
 }

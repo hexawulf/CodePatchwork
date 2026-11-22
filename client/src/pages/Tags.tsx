@@ -9,7 +9,6 @@ import { stringToColor } from "@/lib/utils";
 
 export default function Tags() {
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Fetch all tags
   const { data: tags = [] } = useQuery<string[]>({
@@ -82,11 +81,11 @@ export default function Tags() {
           <h2 className="text-lg font-medium text-slate-900 dark:text-white mb-4">
             Snippets tagged with <span className="text-primary-600 dark:text-primary-400">{activeTag}</span>
           </h2>
-          <SnippetGrid 
-            snippets={snippets} 
-            isLoading={isLoading} 
+          <SnippetGrid
+            snippets={snippets}
+            isLoading={isLoading}
             error={error}
-            viewMode={viewMode}
+            viewMode="grid"
           />
         </div>
       ) : (

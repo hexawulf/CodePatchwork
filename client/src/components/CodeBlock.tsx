@@ -1,8 +1,22 @@
 import { Highlight, themes } from "prism-react-renderer";
 import { useCodeTheme } from "@/contexts/CodeThemeContext";
 
-// Define supported themes
 export type CodeTheme = "nightOwl" | "dracula" | "github" | "vsDark" | "vsLight";
+
+const THEME_MAP = {
+  nightOwl: themes.nightOwl,
+  dracula: themes.dracula,
+  github: themes.github,
+  vsDark: themes.vsDark,
+  vsLight: themes.vsLight,
+} as const;
+
+const SUPPORTED_LANGUAGES = new Set([
+  "markup", "html", "xml", "svg", "mathml", "ssml", "atom", "rss",
+  "css", "clike", "javascript", "js", "jsx", "typescript", "ts", "tsx",
+  "bash", "c", "cpp", "csharp", "diff", "git", "go", "graphql", "json",
+  "markdown", "md", "python", "py", "sql", "yaml", "yml",
+]);
 
 interface CodeBlockProps {
   code?: string;
@@ -10,84 +24,46 @@ interface CodeBlockProps {
   showLineNumbers?: boolean;
 }
 
-// List of supported languages in prism-react-renderer
-const supportedLanguages = [
-  "markup", "html", "xml", "svg", "mathml", "ssml", "atom", "rss",
-  "css", "clike", "javascript", "js", "jsx", "typescript", "ts", "tsx",
-  "bash", "c", "cpp", "csharp", "diff", "git", "go", "graphql", "json",
-  "markdown", "md", "python", "py", "sql", "yaml", "yml"
-];
-
-export default function CodeBlock({ 
-  code = "", 
-  language = "text", 
-  showLineNumbers = false
+export default function CodeBlock({
+  code = "",
+  language = "text",
+  showLineNumbers = false,
 }: CodeBlockProps) {
   const { codeTheme } = useCodeTheme();
-  
-  // Normalize language and ensure it's supported
-  let normalizedLanguage = "text";
-  
-  if (language) {
-    const langLower = language.toLowerCase();
-    // Check if the language is supported
-    if (supportedLanguages.includes(langLower)) {
-      normalizedLanguage = langLower;
-    }
-  }
-  
-  // If code is undefined or null, provide a fallback
+  const langLower = language?.toLowerCase() ?? "";
+  const normalizedLanguage = SUPPORTED_LANGUAGES.has(langLower) ? langLower : "text";
   const safeCode = code || "";
-  
-  // Get the theme object based on the theme name
-  const getThemeObject = (themeName: CodeTheme) => {
-    switch (themeName) {
-      case "dracula":
-        return themes.dracula;
-      case "github":
-        return themes.github;
-      case "vsDark":
-        return themes.vsDark;
-      case "vsLight":
-        return themes.vsLight;
-      case "nightOwl":
-      default:
-        return themes.nightOwl;
-    }
-  };
-  
-  try {
-    return (
-      <div className="relative">
-        <Highlight 
-          theme={getThemeObject(codeTheme)}
-          code={safeCode} 
-          language={normalizedLanguage}
-        >
-          {({ className, style, tokens, getLineProps, getTokenProps }) => (
-            <pre style={{ ...style, margin: 0, padding: '1rem', textAlign: 'left', overflow: 'auto' }} className={className}>
-              {tokens.map((line, i) => (
-                <div key={i} className={getLineProps({ line, key: i }).className} style={getLineProps({ line, key: i }).style}>
-                  {showLineNumbers && <span className="opacity-50 mr-4 inline-block w-8 text-right">{i + 1}</span>}
-                  {line.map((token, key) => (
-                    <span key={key} className={getTokenProps({ token, key }).className} style={getTokenProps({ token, key }).style}>
-                      {token.content}
-                    </span>
-                  ))}
+  const theme = THEME_MAP[codeTheme] ?? themes.nightOwl;
+
+  return (
+    <div className="relative">
+      <Highlight theme={theme} code={safeCode} language={normalizedLanguage}>
+        {({ className, style, tokens, getLineProps, getTokenProps }) => (
+          <pre
+            style={{ ...style, margin: 0, padding: "1rem", textAlign: "left", overflow: "auto" }}
+            className={className}
+          >
+            {tokens.map((line, i) => {
+              const lineProps = getLineProps({ line });
+              return (
+                <div key={i} className={lineProps.className} style={lineProps.style}>
+                  {showLineNumbers && (
+                    <span className="opacity-50 mr-4 inline-block w-8 text-right">{i + 1}</span>
+                  )}
+                  {line.map((token, key) => {
+                    const tokenProps = getTokenProps({ token });
+                    return (
+                      <span key={key} className={tokenProps.className} style={tokenProps.style}>
+                        {token.content}
+                      </span>
+                    );
+                  })}
                 </div>
-              ))}
-            </pre>
-          )}
-        </Highlight>
-      </div>
-    );
-  } catch (error) {
-    console.error("Error rendering code block:", error);
-    // Fallback to a simple pre/code block if Highlight fails
-    return (
-      <pre className="bg-slate-800 text-white p-4 rounded overflow-auto">
-        <code>{safeCode}</code>
-      </pre>
-    );
-  }
+              );
+            })}
+          </pre>
+        )}
+      </Highlight>
+    </div>
+  );
 }

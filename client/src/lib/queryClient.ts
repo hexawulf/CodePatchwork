@@ -1,4 +1,4 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, type QueryFunction, type QueryKey } from "@tanstack/react-query";
 import { auth } from "@/lib/firebase";
 
 async function throwIfResNotOk(res: Response) {
@@ -12,63 +12,32 @@ interface ApiRequestOptions {
   expectJson?: boolean;
 }
 
-function transformCollection(collection: any) {
-  if (!collection) return collection;
-  return {
-    id: collection.id,
-    name: collection.name,
-    description: collection.description,
-    userId: collection.userid ?? collection.userId,
-    createdAt: collection.createdat ?? collection.createdAt,
-    updatedAt: collection.updatedat ?? collection.updatedAt,
-  };
+/**
+ * Resolve a TanStack Query key into a request URL.
+ * Supports single URL keys (["/api/snippets?tag=go"]) and segmented path keys
+ * (["/api/collections", 12, "snippets"] -> "/api/collections/12/snippets").
+ */
+export function buildQueryUrl(queryKey: QueryKey): string {
+  const segments = queryKey
+    .filter((part): part is string | number => typeof part === "string" || typeof part === "number")
+    .map((part, idx) => (idx === 0 ? String(part).replace(/\/+$/, "") : encodeURIComponent(String(part))));
+  return segments.join("/");
 }
 
-function transformSnippet(snippet: any) {
-  if (!snippet) return snippet;
-  return {
-    id: snippet.id,
-    title: snippet.title,
-    description: snippet.description,
-    code: snippet.code,
-    language: snippet.language,
-    tags: snippet.tags,
-    userId: snippet.userid ?? snippet.userId,
-    createdAt: snippet.createdat ?? snippet.createdAt,
-    updatedAt: snippet.updatedat ?? snippet.updatedAt,
-    viewCount: snippet.viewcount ?? snippet.viewCount ?? 0,
-    isFavorite: snippet.isfavorite ?? snippet.isFavorite ?? false,
-    shareId: snippet.shareid ?? snippet.shareId ?? null,
-    isPublic: snippet.ispublic ?? snippet.isPublic ?? false,
-  };
-}
-
-function transformComment(comment: any) {
-  if (!comment) return comment;
-  return {
-    id: comment.id,
-    snippetId: comment.snippetid ?? comment.snippetId,
-    content: comment.content,
-    userId: comment.userid ?? comment.userId,
-    createdAt: comment.createdat ?? comment.createdAt,
-    updatedAt: comment.updatedat ?? comment.updatedAt,
-  };
-}
-
-function transformApiResponse(url: string, data: any) {
-  if (!data) return data;
-
-  if (Array.isArray(data)) {
-    if (url.includes("/collections")) return data.map(transformCollection);
-    if (url.includes("/snippets")) return data.map(transformSnippet);
-    if (url.includes("/comments")) return data.map(transformComment);
-    return data;
-  }
-
-  if (url.includes("/collections")) return transformCollection(data);
-  if (url.includes("/snippets")) return transformSnippet(data);
-  if (url.includes("/comments")) return transformComment(data);
-  return data;
+/** Invalidate all snippet list/filtered/metadata queries. */
+export function invalidateSnippetQueries(qc: QueryClient): Promise<void> {
+  return qc.invalidateQueries({
+    predicate: (query) => {
+      const first = query.queryKey[0];
+      return (
+        typeof first === "string" &&
+        (first.startsWith("/api/snippets") ||
+          first.startsWith("/api/public/snippets") ||
+          first === "/api/languages" ||
+          first === "/api/tags")
+      );
+    },
+  });
 }
 
 async function getAuthToken(): Promise<string | null> {
@@ -86,27 +55,24 @@ async function getAuthToken(): Promise<string | null> {
 export async function apiRequest<T = any>(
   method: string,
   url: string,
-  data?: any,
-  options: ApiRequestOptions = {}
+  data?: unknown,
+  options: ApiRequestOptions = {},
 ): Promise<T> {
   const token = await getAuthToken();
 
   const headers: Record<string, string> = {};
-  if (data) headers["Content-Type"] = "application/json";
+  if (data !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(url, {
     method,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
+    body: data !== undefined ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
   if (options.expectJson === false || res.status === 204) {
-    if (!res.ok) {
-      const text = (await res.text()) || res.statusText;
-      throw new Error(`${res.status}: ${text}`);
-    }
+    await throwIfResNotOk(res);
     return undefined as T;
   }
 
@@ -117,42 +83,42 @@ export async function apiRequest<T = any>(
     if (!res.ok) {
       throw new Error(json.message || `API error: ${res.status}`);
     }
-    return transformApiResponse(url, json);
+    return json as T;
   }
 
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(`${res.status}: ${text.slice(0, 200)}`);
   }
-  const text = await res.text();
   throw new Error("Unexpected non-JSON response: " + text.slice(0, 200));
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
+export function getQueryFn<T>({
+  on401: unauthorizedBehavior,
+}: {
   on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
+}): QueryFunction<T> {
+  return async ({ queryKey }) => {
     const token = await getAuthToken();
 
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    const url = queryKey[0] as string;
+    const url = buildQueryUrl(queryKey);
     const res = await fetch(url, {
       headers,
       credentials: "include",
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      return null as T;
     }
 
     await throwIfResNotOk(res);
-    const json = await res.json();
-    return transformApiResponse(url, json);
+    return (await res.json()) as T;
   };
+}
 
 export const queryClient = new QueryClient({
   defaultOptions: {

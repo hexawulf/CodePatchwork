@@ -1,12 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, invalidateSnippetQueries } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSnippetContext } from "@/contexts/SnippetContext";
-import { type Snippet } from "@shared/schema";
+import type { Snippet } from "@shared/schema";
 import { LANGUAGES } from "@/lib/constants";
 import {
   Dialog,
@@ -33,47 +32,54 @@ interface AddSnippetDialogProps {
   isEditMode?: boolean;
 }
 
-export default function AddSnippetDialog({ 
-  open: controlledOpen, 
-  onOpenChange, 
+export default function AddSnippetDialog({
+  open: controlledOpen,
+  onOpenChange,
   snippetToEdit = null,
-  isEditMode = false
+  isEditMode = false,
 }: AddSnippetDialogProps = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // Remove useSnippetContext for now since we're using direct API calls
   const [internalOpen, setInternalOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState("javascript");
+  const [tagsInput, setTagsInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Determine if the component is controlled or uncontrolled
+
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
-  
+
   const setOpen = (newOpen: boolean) => {
-    if (isControlled && onOpenChange) {
-      onOpenChange(newOpen);
+    if (isControlled) {
+      onOpenChange?.(newOpen);
     } else {
       setInternalOpen(newOpen);
     }
   };
-  
-  // Set form values when snippetToEdit changes
-  useEffect(() => {
-    if (snippetToEdit) {
-      setTitle(snippetToEdit.title);
-      setCode(snippetToEdit.code);
-      setDescription(snippetToEdit.description || "");
-      setLanguage(snippetToEdit.language);
-    }
-  }, [snippetToEdit]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (open) {
+      if (isEditMode && snippetToEdit) {
+        setTitle(snippetToEdit.title);
+        setCode(snippetToEdit.code);
+        setDescription(snippetToEdit.description || "");
+        setLanguage(snippetToEdit.language);
+        setTagsInput(snippetToEdit.tags?.join(", ") || "");
+      } else if (!isEditMode) {
+        setTitle("");
+        setCode("");
+        setDescription("");
+        setLanguage("javascript");
+        setTagsInput("");
+      }
+    }
+  }, [open, isEditMode, snippetToEdit]);
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
+
     if (!title.trim() || !code.trim()) {
       toast({
         title: "Error",
@@ -82,53 +88,42 @@ export default function AddSnippetDialog({
       });
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
-      const snippet = {
-        title,
+      const tags = tagsInput
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const payload = {
+        title: title.trim(),
         code,
-        description: description || null,
+        description: description.trim() || null,
         language,
-        tags: snippetToEdit?.tags || [],
-        userId: null
+        tags,
       };
-      
-      // Determine if we're creating or updating
+
       const isEditing = isEditMode && snippetToEdit;
-      const API_URL = isEditing 
-        ? `/api/snippets/${snippetToEdit.id}` 
-        : '/api/snippets';
-        
-      // FIXED: Use apiRequest instead of direct fetch to include authentication
-      const result = await apiRequest(
-        isEditing ? 'PUT' : 'POST',
-        API_URL,
-        snippet
+      await apiRequest(
+        isEditing ? "PUT" : "POST",
+        isEditing ? `/api/snippets/${snippetToEdit.id}` : "/api/snippets",
+        payload,
       );
-      
-      // Success
-      
+
       toast({
         title: "Success",
         description: isEditing ? "Snippet updated successfully" : "Snippet created successfully",
       });
-      
-      // Reset form and close modal
-      setTitle("");
-      setCode("");
-      setDescription("");
-      setLanguage("javascript");
+
       setOpen(false);
-      
-      // Refresh snippets data
-      queryClient.invalidateQueries({ queryKey: ['/api/snippets'] });
+      invalidateSnippetQueries(queryClient);
     } catch (error) {
-      console.error("Error creating snippet:", error);
+      console.error("Error saving snippet:", error);
       toast({
         title: "Error",
-        description: `Failed to ${isEditMode ? 'update' : 'create'} snippet. Please try again.`,
+        description: `Failed to ${isEditMode ? "update" : "create"} snippet. Please try again.`,
         variant: "destructive",
       });
     } finally {
@@ -138,7 +133,6 @@ export default function AddSnippetDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {/* Only render the trigger button when not controlled externally */}
       {!isControlled && (
         <DialogTrigger asChild>
           <Button size="sm" className="flex items-center">
@@ -149,15 +143,14 @@ export default function AddSnippetDialog({
       )}
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? 'Edit Snippet' : 'Create New Snippet'}</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Snippet" : "Create New Snippet"}</DialogTitle>
           <DialogDescription>
-            {isEditMode 
-              ? 'Update your existing code snippet'
-              : 'Add a new code snippet to your collection'
-            }
+            {isEditMode
+              ? "Update your existing code snippet"
+              : "Add a new code snippet to your collection"}
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <label htmlFor="title" className="text-sm font-medium">Title</label>
@@ -169,7 +162,7 @@ export default function AddSnippetDialog({
               required
             />
           </div>
-          
+
           <div className="space-y-2">
             <label htmlFor="description" className="text-sm font-medium">Description</label>
             <Textarea
@@ -180,23 +173,35 @@ export default function AddSnippetDialog({
               rows={2}
             />
           </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="language" className="text-sm font-medium">Language</label>
-            <Select value={language} onValueChange={setLanguage}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a language" />
-              </SelectTrigger>
-              <SelectContent>
-                {LANGUAGES.map((lang) => (
-                  <SelectItem key={lang.value} value={lang.value}>
-                    {lang.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="language" className="text-sm font-medium">Language</label>
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a language" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LANGUAGES.map((lang) => (
+                    <SelectItem key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="tags" className="text-sm font-medium">Tags (comma-separated)</label>
+              <Input
+                id="tags"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="react, hooks, utils"
+              />
+            </div>
           </div>
-          
+
           <div className="space-y-2">
             <label htmlFor="code" className="text-sm font-medium">Code</label>
             <Textarea
@@ -208,7 +213,7 @@ export default function AddSnippetDialog({
               required
             />
           </div>
-          
+
           <DialogFooter className="mt-6">
             <Button
               type="button"
@@ -219,10 +224,13 @@ export default function AddSnippetDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting 
-                ? (isEditMode ? "Updating..." : "Creating...") 
-                : (isEditMode ? "Update Snippet" : "Create Snippet")
-              }
+              {isSubmitting
+                ? isEditMode
+                  ? "Updating..."
+                  : "Creating..."
+                : isEditMode
+                  ? "Update Snippet"
+                  : "Create Snippet"}
             </Button>
           </DialogFooter>
         </form>

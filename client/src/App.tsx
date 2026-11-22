@@ -1,6 +1,7 @@
 import React, { useEffect, lazy, Suspense } from "react";
 import { Redirect, Switch, Route } from "wouter";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { CodeThemeProvider } from "@/contexts/CodeThemeContext";
 import { SnippetProvider } from "@/contexts/SnippetContext";
@@ -19,7 +20,7 @@ const SharedSnippet = lazy(() => import("@/pages/SharedSnippet"));
 
 const PageLoader = () => (
   <div className="h-screen flex items-center justify-center">
-    <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full"></div>
+    <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full" />
   </div>
 );
 
@@ -71,7 +72,7 @@ const SignInTriggerPage: React.FC = () => {
     <div className="h-screen flex flex-col items-center justify-center">
       <div className="mb-4">{loading ? "Loading authentication..." : "Redirecting to sign-in..."}</div>
       {loading && (
-        <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full"></div>
+        <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full" />
       )}
     </div>
   );
@@ -84,7 +85,7 @@ export default function App() {
     return (
       <div className="h-screen flex flex-col items-center justify-center">
         <div className="mb-4">Loading...</div>
-        <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full"></div>
+        <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full" />
       </div>
     );
   }
@@ -96,6 +97,7 @@ export default function App() {
           <CollectionProvider>
             <TooltipProvider>
               {user ? <AuthenticatedRouter /> : <PublicRouter />}
+              <Toaster />
             </TooltipProvider>
           </CollectionProvider>
         </SnippetProvider>

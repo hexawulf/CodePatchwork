@@ -1,10 +1,10 @@
+import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import SnippetGrid from "@/components/SnippetGrid";
 import SimpleAdvancedSearch from "@/components/SimpleAdvancedSearch";
 import FilterBadges from "@/components/FilterBadges";
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Grid3X3, List, Plus } from "lucide-react";
+import { Grid3X3, List } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,104 +13,74 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSnippets } from "@/hooks/useSnippets";
-import AddSnippetDialog from "@/components/AddSnippetDialog";
 import { useSnippetContext } from "@/contexts/SnippetContext";
+import { SORT_OPTIONS, type SortOrder } from "@/lib/constants";
+import { sortSnippets } from "@/lib/snippets";
 
 export default function Snippets() {
-  // Use global context for search term
-  const { searchTerm } = useSnippetContext();
-  
-  // Local state for filtering and display
+  const {
+    searchTerm,
+    activeLanguage,
+    setActiveLanguage,
+    activeTag,
+    setActiveTag,
+  } = useSnippetContext();
+
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm || "");
-  const [activeLanguages, setActiveLanguages] = useState<string[] | null>(null);
-  const [activeTags, setActiveTags] = useState<string[] | null>(null);
+  const [activeLanguages, setActiveLanguages] = useState<string[] | null>(
+    activeLanguage ? [activeLanguage] : null,
+  );
+  const [activeTags, setActiveTags] = useState<string[] | null>(activeTag ? [activeTag] : null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [isAddSnippetOpen, setIsAddSnippetOpen] = useState(false);
-  
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  
-  // Update local search term when global context changes
+  const [sortOrder, setSortOrder] = useState<SortOrder>("recent");
+
   useEffect(() => {
     setLocalSearchTerm(searchTerm || "");
   }, [searchTerm]);
-  
-  // Add a "New Snippet" button
-  const handleAddSnippet = () => {
-    setIsAddSnippetOpen(true);
-  };
-  const [sortOrder, setSortOrder] = useState<string>("recent");
-  
+
+  useEffect(() => {
+    setActiveLanguages(activeLanguage ? [activeLanguage] : null);
+  }, [activeLanguage]);
+
+  useEffect(() => {
+    setActiveTags(activeTag ? [activeTag] : null);
+  }, [activeTag]);
+
   const { snippets, isLoading, error, refetch } = useSnippets({
     search: localSearchTerm,
     languages: activeLanguages,
     tags: activeTags,
-    favoritesOnly
+    favoritesOnly,
   });
-  
-  // Handle filter changes
-  const handleSearchChange = (value: string) => {
-    setLocalSearchTerm(value);
-  };
-  
-  const handleLanguageChange = (languages: string[] | null) => {
-    setActiveLanguages(languages);
-  };
-  
-  const handleTagChange = (tags: string[] | null) => {
-    setActiveTags(tags);
-  };
-  
-  const handleFavoriteToggle = (favoritesOnly: boolean) => {
-    setFavoritesOnly(favoritesOnly);
-  };
-  
-  // Handle filter removal
+
+  const sortedSnippets = useMemo(() => sortSnippets(snippets, sortOrder), [snippets, sortOrder]);
+
   const handleRemoveLanguage = (language: string) => {
-    if (activeLanguages) {
-      const updated = activeLanguages.filter(lang => lang !== language);
-      setActiveLanguages(updated.length > 0 ? updated : null);
-    }
+    if (!activeLanguages) return;
+    const updated = activeLanguages.filter((lang) => lang !== language);
+    setActiveLanguages(updated.length > 0 ? updated : null);
+    if (activeLanguage === language) setActiveLanguage(null);
   };
-  
+
   const handleRemoveTag = (tag: string) => {
-    if (activeTags) {
-      const updated = activeTags.filter(t => t !== tag);
-      setActiveTags(updated.length > 0 ? updated : null);
-    }
+    if (!activeTags) return;
+    const updated = activeTags.filter((t) => t !== tag);
+    setActiveTags(updated.length > 0 ? updated : null);
+    if (activeTag === tag) setActiveTag(null);
   };
-  
-  const handleRemoveFavorites = () => {
-    setFavoritesOnly(false);
-  };
-  
+
   const handleClearAllFilters = () => {
     setLocalSearchTerm("");
     setActiveLanguages(null);
     setActiveTags(null);
+    setActiveLanguage(null);
+    setActiveTag(null);
     setFavoritesOnly(false);
   };
-  
-  // Sort snippets based on selected order
-  const sortedSnippets = [...(snippets || [])].sort((a, b) => {
-    switch (sortOrder) {
-      case "recent":
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      case "oldest":
-        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-      case "views":
-        return (b.viewCount || 0) - (a.viewCount || 0);
-      case "az":
-        return a.title.localeCompare(b.title);
-      case "za":
-        return b.title.localeCompare(a.title);
-      default:
-        return 0;
-    }
-  });
 
   return (
     <Layout>
-      {/* Page Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">All Snippets</h1>
@@ -119,19 +89,16 @@ export default function Snippets() {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 flex flex-wrap gap-2">
-          <Select 
-            value={sortOrder} 
-            onValueChange={(value) => setSortOrder(value)}
-          >
+          <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
             <SelectTrigger className="h-9 w-[160px] bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="recent">Recently Added</SelectItem>
-              <SelectItem value="oldest">Oldest First</SelectItem>
-              <SelectItem value="views">Most Used</SelectItem>
-              <SelectItem value="az">A-Z</SelectItem>
-              <SelectItem value="za">Z-A</SelectItem>
+              {SORT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -141,6 +108,7 @@ export default function Snippets() {
               size="icon"
               onClick={() => setViewMode("grid")}
               className="h-9 w-9"
+              aria-label="Grid view"
             >
               <Grid3X3 className="h-5 w-5" />
             </Button>
@@ -149,49 +117,43 @@ export default function Snippets() {
               size="icon"
               onClick={() => setViewMode("list")}
               className="h-9 w-9"
+              aria-label="List view"
             >
               <List className="h-5 w-5" />
             </Button>
-            
-            {/* New Snippet button removed to prevent duplication */}
           </div>
         </div>
       </div>
-      
-      {/* Advanced Search and filter */}
+
       <div className="space-y-4 mb-6">
         <SimpleAdvancedSearch
-          onSearchChange={handleSearchChange}
-          onLanguageChange={handleLanguageChange}
-          onTagChange={handleTagChange}
-          onFavoriteFilter={handleFavoriteToggle}
+          selectedLanguages={activeLanguages}
+          selectedTags={activeTags}
+          favoritesOnly={favoritesOnly}
+          onSearchChange={setLocalSearchTerm}
+          onLanguageChange={setActiveLanguages}
+          onTagChange={setActiveTags}
+          onFavoriteFilter={setFavoritesOnly}
           className="mb-2"
           refetch={refetch}
         />
-        
+
         <FilterBadges
           languages={activeLanguages}
           tags={activeTags}
           favoritesOnly={favoritesOnly}
           onRemoveLanguage={handleRemoveLanguage}
           onRemoveTag={handleRemoveTag}
-          onRemoveFavorites={handleRemoveFavorites}
+          onRemoveFavorites={() => setFavoritesOnly(false)}
           onClearAll={handleClearAllFilters}
         />
       </div>
-      
-      {/* Main content */}
-      <SnippetGrid 
-        snippets={sortedSnippets} 
-        isLoading={isLoading} 
+
+      <SnippetGrid
+        snippets={sortedSnippets}
+        isLoading={isLoading}
         error={error}
         viewMode={viewMode}
-      />
-      
-      {/* Add Snippet Dialog */}
-      <AddSnippetDialog
-        open={isAddSnippetOpen}
-        onOpenChange={setIsAddSnippetOpen}
       />
     </Layout>
   );

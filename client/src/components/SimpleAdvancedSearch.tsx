@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -12,17 +12,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-
-// Define filter option type for languages and tags
-type FilterOption = {
-  id: string;
-  label: string;
-  value: string;
-  selected: boolean;
-}
+} from "@/components/ui/dropdown-menu";
 
 interface AdvancedSearchProps {
+  selectedLanguages?: string[] | null;
+  selectedTags?: string[] | null;
+  favoritesOnly?: boolean;
   onSearchChange: (search: string) => void;
   onLanguageChange: (languages: string[] | null) => void;
   onTagChange: (tags: string[] | null) => void;
@@ -31,138 +26,57 @@ interface AdvancedSearchProps {
   refetch?: () => void;
 }
 
-export default function SimpleAdvancedSearch({ 
-  onSearchChange, 
-  onLanguageChange, 
-  onTagChange, 
+export default function SimpleAdvancedSearch({
+  selectedLanguages = null,
+  selectedTags = null,
+  favoritesOnly = false,
+  onSearchChange,
+  onLanguageChange,
+  onTagChange,
   onFavoriteFilter,
   className = "",
-  refetch 
+  refetch,
 }: AdvancedSearchProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [languages, setLanguages] = useState<FilterOption[]>([]);
-  const [tags, setTags] = useState<FilterOption[]>([]);
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
-  
-  // Handle search with proper debounce
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
-  
+  const [searchTerm, setSearchTerm] = useState("");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data: languages = [] } = useQuery<string[]>({
+    queryKey: ["/api/languages"],
+  });
+
+  const { data: tags = [] } = useQuery<string[]>({
+    queryKey: ["/api/tags"],
+  });
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  useEffect(() => clearTimer, []);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
-    
-    // Clear any existing timeout
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-    
-    // Set new debounce timeout
-    const newTimeout = setTimeout(() => {
-      onSearchChange(value);
-    }, 300);
-    
-    setSearchTimeout(newTimeout);
+    clearTimer();
+    timerRef.current = setTimeout(() => onSearchChange(value), 300);
   };
-  
-  // Effect to clean up timeouts when component unmounts
-  useEffect(() => {
-    return () => {
-      // Clean up timeout to prevent memory leaks
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-    };
-  }, [searchTimeout]);
-  
-  // Effect to fetch available languages
-  useEffect(() => {
-    async function fetchLanguages() {
-      try {
-        // apiRequest sends the bearer token, so the list includes the
-        // signed-in user's own languages and not only public ones.
-        const data = await apiRequest<string[]>('GET', '/api/languages');
-        
-        // Convert to filter options format
-        const languageOptions = data.map((lang: string) => ({
-          id: lang,
-          label: lang.charAt(0).toUpperCase() + lang.slice(1),
-          value: lang,
-          selected: false
-        }));
-        
-        setLanguages(languageOptions);
-      } catch (error) {
-        console.error('Error fetching languages:', error);
-      }
-    }
-    
-    fetchLanguages();
-  }, []);
-  
-  // Effect to fetch available tags
-  useEffect(() => {
-    async function fetchTags() {
-      try {
-        const data = await apiRequest<string[]>('GET', '/api/tags');
-        
-        // Convert to filter options format
-        const tagOptions = data.map((tag: string) => ({
-          id: tag,
-          label: tag,
-          value: tag,
-          selected: false
-        }));
-        
-        setTags(tagOptions);
-      } catch (error) {
-        console.error('Error fetching tags:', error);
-      }
-    }
-    
-    fetchTags();
-  }, []);
-  
-  // Handle language selection changes
-  const handleLanguageChange = (languageId: string, isSelected: boolean) => {
-    const updatedLanguages = languages.map(lang => 
-      lang.id === languageId ? { ...lang, selected: isSelected } : lang
-    );
-    
-    setLanguages(updatedLanguages);
-    
-    // Pass only selected languages to parent
-    const selectedLanguages = updatedLanguages
-      .filter(lang => lang.selected)
-      .map(lang => lang.value);
-    
-    onLanguageChange(selectedLanguages.length > 0 ? selectedLanguages : null);
+
+  const toggleItem = (
+    current: string[] | null,
+    item: string,
+    checked: boolean,
+    onChange: (next: string[] | null) => void,
+  ) => {
+    const list = current ?? [];
+    const next = checked ? Array.from(new Set([...list, item])) : list.filter((v) => v !== item);
+    onChange(next.length > 0 ? next : null);
   };
-  
-  // Handle tag selection changes
-  const handleTagChange = (tagId: string, isSelected: boolean) => {
-    const updatedTags = tags.map(tag => 
-      tag.id === tagId ? { ...tag, selected: isSelected } : tag
-    );
-    
-    setTags(updatedTags);
-    
-    // Pass only selected tags to parent
-    const selectedTags = updatedTags
-      .filter(tag => tag.selected)
-      .map(tag => tag.value);
-    
-    onTagChange(selectedTags.length > 0 ? selectedTags : null);
-  };
-  
-  // Handle favorites filter toggle
-  const handleFavoritesToggle = (checked: boolean) => {
-    setFavoritesOnly(checked);
-    onFavoriteFilter(checked);
-  };
-  
-  // Count selected items for badge display
-  const selectedLanguagesCount = languages.filter(l => l.selected).length;
-  const selectedTagsCount = tags.filter(t => t.selected).length;
+
+  const selectedLangSet = new Set(selectedLanguages ?? []);
+  const selectedTagSet = new Set(selectedTags ?? []);
 
   return (
     <div className={`flex flex-col md:flex-row gap-2 ${className}`}>
@@ -175,26 +89,24 @@ export default function SimpleAdvancedSearch({
           value={searchTerm}
           onChange={handleSearchChange}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === "Enter") {
               e.preventDefault();
-              // Trigger immediate search on Enter
+              clearTimer();
               onSearchChange(searchTerm);
-              // Execute immediate refetch if available
-              if (refetch) refetch();
+              refetch?.();
             }
           }}
         />
       </div>
-      
+
       <div className="flex flex-wrap gap-2">
-        {/* Language Filter Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-10 bg-white dark:bg-slate-800">
               Languages
-              {selectedLanguagesCount > 0 && (
+              {selectedLangSet.size > 0 && (
                 <Badge variant="secondary" className="ml-2 rounded-full px-1.5 py-0.5">
-                  {selectedLanguagesCount}
+                  {selectedLangSet.size}
                 </Badge>
               )}
             </Button>
@@ -204,24 +116,25 @@ export default function SimpleAdvancedSearch({
             <DropdownMenuSeparator />
             {languages.map((lang) => (
               <DropdownMenuCheckboxItem
-                key={lang.id}
-                checked={lang.selected}
-                onCheckedChange={(checked) => handleLanguageChange(lang.id, !!checked)}
+                key={lang}
+                checked={selectedLangSet.has(lang)}
+                onCheckedChange={(checked) =>
+                  toggleItem(selectedLanguages, lang, Boolean(checked), onLanguageChange)
+                }
               >
-                {lang.label}
+                {lang.charAt(0).toUpperCase() + lang.slice(1)}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        
-        {/* Tags Filter Dropdown */}
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-10 bg-white dark:bg-slate-800">
               Tags
-              {selectedTagsCount > 0 && (
+              {selectedTagSet.size > 0 && (
                 <Badge variant="secondary" className="ml-2 rounded-full px-1.5 py-0.5">
-                  {selectedTagsCount}
+                  {selectedTagSet.size}
                 </Badge>
               )}
             </Button>
@@ -231,22 +144,23 @@ export default function SimpleAdvancedSearch({
             <DropdownMenuSeparator />
             {tags.map((tag) => (
               <DropdownMenuCheckboxItem
-                key={tag.id}
-                checked={tag.selected}
-                onCheckedChange={(checked) => handleTagChange(tag.id, !!checked)}
+                key={tag}
+                checked={selectedTagSet.has(tag)}
+                onCheckedChange={(checked) =>
+                  toggleItem(selectedTags, tag, Boolean(checked), onTagChange)
+                }
               >
-                {tag.label}
+                {tag}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        
-        {/* Favorites Toggle */}
+
         <div className="flex items-center space-x-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-md border border-input h-10">
-          <Checkbox 
-            id="favorites" 
+          <Checkbox
+            id="favorites"
             checked={favoritesOnly}
-            onCheckedChange={handleFavoritesToggle}
+            onCheckedChange={(checked) => onFavoriteFilter(Boolean(checked))}
           />
           <label
             htmlFor="favorites"

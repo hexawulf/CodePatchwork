@@ -1,10 +1,6 @@
-import { useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertCollectionSchema, type Collection } from "@shared/schema";
+import { useState, useEffect, type FormEvent } from "react";
+import type { Collection } from "@shared/schema";
 import { useCollectionContext } from "@/contexts/CollectionContext";
-
 import {
   Dialog,
   DialogContent,
@@ -13,25 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-
-// Extend the schema with client-side validation
-const collectionFormSchema = insertCollectionSchema.extend({
-  name: z.string().min(1, "Name is required").max(50, "Name cannot exceed 50 characters"),
-  description: z.string().max(200, "Description cannot exceed 200 characters").optional(),
-});
-
-type CollectionFormValues = z.infer<typeof collectionFormSchema>;
 
 interface CollectionDialogProps {
   open?: boolean;
@@ -40,105 +21,118 @@ interface CollectionDialogProps {
   isEditMode?: boolean;
 }
 
-export default function CollectionDialog({ 
-  open = false, 
+export default function CollectionDialog({
+  open = false,
   onOpenChange,
   collectionToEdit = null,
-  isEditMode = false
+  isEditMode = false,
 }: CollectionDialogProps) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [descError, setDescError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { createCollection, updateCollection } = useCollectionContext();
-  
-  // Initialize form with default values or edit values
-  const form = useForm<CollectionFormValues>({
-    resolver: zodResolver(collectionFormSchema),
-    defaultValues: {
-      name: collectionToEdit?.name || "",
-      description: collectionToEdit?.description || "",
-    },
-  });
-  
-  // Handle form submission
-  const onSubmit = async (values: CollectionFormValues) => {
+
+  useEffect(() => {
+    if (open) {
+      setName(isEditMode && collectionToEdit ? collectionToEdit.name : "");
+      setDescription(isEditMode && collectionToEdit ? collectionToEdit.description || "" : "");
+      setNameError(null);
+      setDescError(null);
+    }
+  }, [open, isEditMode, collectionToEdit]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setNameError("Name is required");
+      return;
+    }
+    if (trimmedName.length > 50) {
+      setNameError("Name cannot exceed 50 characters");
+      return;
+    }
+    if (description.length > 200) {
+      setDescError("Description cannot exceed 200 characters");
+      return;
+    }
+
+    setNameError(null);
+    setDescError(null);
     setIsSubmitting(true);
-    
+
     try {
+      const payload = {
+        name: trimmedName,
+        description: description.trim() || null,
+      };
       if (isEditMode && collectionToEdit) {
-        await updateCollection(collectionToEdit.id, values);
+        await updateCollection(collectionToEdit.id, payload);
       } else {
-        await createCollection(values);
+        await createCollection(payload);
       }
-      
-      if (onOpenChange) {
-        onOpenChange(false);
-      }
+      onOpenChange?.(false);
     } catch (error) {
       console.error("Collection submit error:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Edit Collection" : "Create Collection"}
-          </DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Collection" : "Create Collection"}</DialogTitle>
           <DialogDescription>
-            {isEditMode 
+            {isEditMode
               ? "Update your collection details below."
-              : "Create a new collection to organize your code snippets."
-            }
+              : "Create a new collection to organize your code snippets."}
           </DialogDescription>
         </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Collection name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="collection-name">Name</Label>
+            <Input
+              id="collection-name"
+              placeholder="Collection name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameError) setNameError(null);
+              }}
+              maxLength={50}
+              required
             />
-            
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Brief description of this collection"
-                      className="resize-none"
-                      {...field}
-                      value={field.value || ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+            {nameError && <p className="text-sm font-medium text-destructive">{nameError}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="collection-description">Description (optional)</Label>
+            <Textarea
+              id="collection-description"
+              placeholder="Brief description of this collection"
+              className="resize-none"
+              value={description}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (descError) setDescError(null);
+              }}
+              maxLength={200}
             />
-            
-            <DialogFooter>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Processing..." : isEditMode ? "Update" : "Create"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+            {descError && <p className="text-sm font-medium text-destructive">{descError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Processing..." : isEditMode ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

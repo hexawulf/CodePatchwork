@@ -1,14 +1,5 @@
-import React, { createContext, ReactNode, useContext } from "react";
-import { useAuth } from "@/lib/useAuth";
-
-interface AppUser {
-  id: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+import { createContext, type ReactNode, useContext } from "react";
+import { useAuth, type AppUser } from "@/lib/useAuth";
 
 interface AuthContextType {
   user: AppUser | null;
@@ -21,21 +12,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { user, loading, signIn, signOut, isAuthenticated } = useAuth();
-
-  const value: AuthContextType = {
-    user,
-    loading,
-    signIn,
-    signOut,
-    isAuthenticated,
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = useAuth();
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuthContext() {
