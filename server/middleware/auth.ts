@@ -5,6 +5,7 @@ import { storage } from "../storage";
 import logger from "../logger";
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: User;

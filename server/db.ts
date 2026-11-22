@@ -18,6 +18,6 @@ pool.on("error", (err) => {
 
 export const db = drizzle(pool, { schema });
 
-export async function query(text: string, params?: any[]) {
+export async function query(text: string, params?: unknown[]) {
   return pool.query(text, params);
 }

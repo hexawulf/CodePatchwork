@@ -43,7 +43,7 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
       // Clear the form and refetch comments
       setNewComment('');
       queryClient.invalidateQueries({ queryKey: [`/api/snippets/${snippetId}/comments`] });
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to post your comment. Please try again.',
