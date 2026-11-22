@@ -93,14 +93,14 @@ export type InsertCollection = z.infer<typeof insertCollectionSchema>;
 export type Collection = typeof collections.$inferSelect;
 export type CollectionWithCount = Collection & { snippetCount: number };
 
-// Collection Items
+// Collection Items - Maps live DB table "collectionItems" & lowercase columns to TS properties
 export const collectionItems = pgTable(
-  "collection_items",
+  "collectionItems",
   {
     id: serial("id").primaryKey(),
-    collectionId: integer("collection_id").notNull(),
-    snippetId: integer("snippet_id").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    collectionId: integer("collectionid").notNull(),
+    snippetId: integer("snippetid").notNull(),
+    createdAt: timestamp("createdat", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("collection_items_collection_snippet_uidx").on(

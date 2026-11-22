@@ -3,12 +3,12 @@
 
 BEGIN;
 
--- Deduplicate any legacy collection_items pairs before creating the unique index.
-DELETE FROM collection_items a
-USING collection_items b
+-- Deduplicate any legacy collectionItems pairs before creating the unique index.
+DELETE FROM "collectionItems" a
+USING "collectionItems" b
 WHERE a.id > b.id
-  AND a.collection_id = b.collection_id
-  AND a.snippet_id = b.snippet_id;
+  AND a.collectionid = b.collectionid
+  AND a.snippetid = b.snippetid;
 
 CREATE INDEX IF NOT EXISTS snippets_userid_updatedat_idx
   ON snippets (userid, updatedat DESC);
@@ -23,10 +23,10 @@ CREATE INDEX IF NOT EXISTS collections_userid_idx
   ON collections (userid);
 
 CREATE UNIQUE INDEX IF NOT EXISTS collection_items_collection_snippet_uidx
-  ON collection_items (collection_id, snippet_id);
+  ON "collectionItems" (collectionid, snippetid);
 
 CREATE INDEX IF NOT EXISTS collection_items_snippet_idx
-  ON collection_items (snippet_id);
+  ON "collectionItems" (snippetid);
 
 CREATE INDEX IF NOT EXISTS comments_snippetid_createdat_idx
   ON comments (snippetid, createdat ASC);
