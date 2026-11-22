@@ -3,9 +3,9 @@ import {
   snippets, type Snippet, type InsertSnippet,
   collections, type Collection, type InsertCollection,
   collectionItems, type CollectionItem, type InsertCollectionItem,
-  comments, type Comment, type InsertComment
+  comments, type Comment, type InsertComment,
 } from "@shared/schema";
-import { eq, and, or, isNotNull, ilike, sql, desc, asc } from "drizzle-orm";
+import { eq, and, or, inArray, isNotNull, ilike, sql, desc, asc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { db } from "./db";
 
@@ -19,23 +19,25 @@ export function newShareId(): string {
   return randomBytes(9).toString("base64url");
 }
 
+export interface SnippetFilters {
+  search?: string;
+  language?: string | string[];
+  tag?: string | string[];
+  favorites?: boolean;
+  isPublic?: boolean;
+  userId?: string;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   upsertUser(user: InsertUser): Promise<User>;
 
-  getSnippets(filters?: {
-    search?: string;
-    language?: string | string[];
-    tag?: string | string[];
-    favorites?: boolean;
-    isPublic?: boolean;
-    userId?: string;
-  }): Promise<Snippet[]>;
+  getSnippets(filters?: SnippetFilters): Promise<Snippet[]>;
   getSnippet(id: number): Promise<Snippet | undefined>;
   createSnippet(snippet: InsertSnippet): Promise<Snippet>;
-  updateSnippet(id: number, snippet: InsertSnippet): Promise<Snippet>;
+  updateSnippet(id: number, snippet: Omit<InsertSnippet, "userId">): Promise<Snippet>;
   deleteSnippet(id: number): Promise<void>;
   incrementSnippetViewCount(id: number): Promise<void>;
   toggleSnippetFavorite(id: number): Promise<Snippet>;
@@ -46,7 +48,7 @@ export interface IStorage {
   getCollections(userId?: string): Promise<Collection[]>;
   getCollection(id: number): Promise<Collection | undefined>;
   createCollection(collection: InsertCollection): Promise<Collection>;
-  updateCollection(id: number, collection: InsertCollection): Promise<Collection>;
+  updateCollection(id: number, collection: Omit<InsertCollection, "userId">): Promise<Collection>;
   deleteCollection(id: number): Promise<void>;
 
   getCollectionSnippets(collectionId: number): Promise<Snippet[]>;
@@ -65,92 +67,84 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-
   // ─── Users ────────────────────────────────────────────────────
 
   async getUser(id: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0];
+    const [row] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return row;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    return result[0];
+    const [row] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return row;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(insertUser).returning();
-    return result[0];
+    const [row] = await db.insert(users).values(insertUser).returning();
+    return row;
   }
 
   async upsertUser(insertUser: InsertUser): Promise<User> {
-    const result = await db
+    const [row] = await db
       .insert(users)
       .values(insertUser)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...insertUser,
+          email: insertUser.email,
+          displayName: insertUser.displayName,
+          photoURL: insertUser.photoURL,
           updatedAt: new Date(),
         },
       })
       .returning();
-    return result[0];
+    return row;
   }
 
   // ─── Snippets ─────────────────────────────────────────────────
 
-  async getSnippets(filters?: {
-    search?: string;
-    language?: string | string[];
-    tag?: string | string[];
-    favorites?: boolean;
-    isPublic?: boolean;
-    userId?: string;
-  }): Promise<Snippet[]> {
+  async getSnippets(filters?: SnippetFilters): Promise<Snippet[]> {
     const conditions = [];
 
-    if (filters) {
-      if (filters.userId) {
-        conditions.push(eq(snippets.userId, filters.userId));
-      }
+    if (filters?.userId) {
+      conditions.push(eq(snippets.userId, filters.userId));
+    }
 
-      if (filters.language) {
-        if (Array.isArray(filters.language)) {
-          const langConds = filters.language.map((lang) => eq(snippets.language, lang));
-          if (langConds.length > 0) {
-            conditions.push(or(...langConds));
-          }
-        } else {
-          conditions.push(eq(snippets.language, filters.language));
+    if (filters?.language) {
+      if (Array.isArray(filters.language)) {
+        if (filters.language.length > 0) {
+          conditions.push(inArray(snippets.language, filters.language));
         }
+      } else {
+        conditions.push(eq(snippets.language, filters.language));
       }
+    }
 
-      if (filters.search) {
-        const pattern = `%${escapeLike(filters.search)}%`;
-        conditions.push(
-          or(
-            ilike(snippets.title, pattern),
-            ilike(snippets.code, pattern)
-          )
-        );
-      }
+    if (filters?.search) {
+      const pattern = `%${escapeLike(filters.search)}%`;
+      conditions.push(or(ilike(snippets.title, pattern), ilike(snippets.code, pattern)));
+    }
 
-      if (filters.tag) {
-        if (Array.isArray(filters.tag)) {
-          conditions.push(sql`${snippets.tags} && ARRAY[${filters.tag}]::text[]`);
-        } else {
-          conditions.push(sql`${snippets.tags} @> ARRAY[${filters.tag}]::text[]`);
+    if (filters?.tag) {
+      if (Array.isArray(filters.tag)) {
+        if (filters.tag.length > 0) {
+          const items = sql.join(
+            filters.tag.map((t) => sql`${t}`),
+            sql`, `,
+          );
+          conditions.push(sql`${snippets.tags} && ARRAY[${items}]::text[]`);
         }
+      } else {
+        conditions.push(sql`${snippets.tags} @> ARRAY[${filters.tag}]::text[]`);
       }
+    }
 
-      if (filters.favorites) {
-        conditions.push(eq(snippets.isFavorite, true));
-      }
+    if (filters?.favorites) {
+      conditions.push(eq(snippets.isFavorite, true));
+    }
 
-      if (filters.isPublic !== undefined) {
-        conditions.push(eq(snippets.isPublic, filters.isPublic));
-      }
+    if (filters?.isPublic !== undefined) {
+      conditions.push(eq(snippets.isPublic, filters.isPublic));
     }
 
     if (conditions.length > 0) {
@@ -161,12 +155,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSnippet(id: number): Promise<Snippet | undefined> {
-    const result = await db.select().from(snippets).where(eq(snippets.id, id)).limit(1);
-    return result[0];
+    const [row] = await db.select().from(snippets).where(eq(snippets.id, id)).limit(1);
+    return row;
   }
 
   async createSnippet(snippet: InsertSnippet): Promise<Snippet> {
-    const result = await db
+    const [row] = await db
       .insert(snippets)
       .values({
         title: snippet.title,
@@ -179,11 +173,11 @@ export class DatabaseStorage implements IStorage {
         isPublic: snippet.isPublic ?? false,
       })
       .returning();
-    return result[0];
+    return row;
   }
 
-  async updateSnippet(id: number, snippet: InsertSnippet): Promise<Snippet> {
-    const result = await db
+  async updateSnippet(id: number, snippet: Omit<InsertSnippet, "userId">): Promise<Snippet> {
+    const [row] = await db
       .update(snippets)
       .set({
         title: snippet.title,
@@ -199,16 +193,18 @@ export class DatabaseStorage implements IStorage {
       .where(eq(snippets.id, id))
       .returning();
 
-    if (!result[0]) {
+    if (!row) {
       throw new Error(`Snippet with id ${id} not found`);
     }
-    return result[0];
+    return row;
   }
 
   async deleteSnippet(id: number): Promise<void> {
-    await db.delete(collectionItems).where(eq(collectionItems.snippetId, id));
-    await db.delete(comments).where(eq(comments.snippetId, id));
-    await db.delete(snippets).where(eq(snippets.id, id));
+    await db.transaction(async (tx) => {
+      await tx.delete(collectionItems).where(eq(collectionItems.snippetId, id));
+      await tx.delete(comments).where(eq(comments.snippetId, id));
+      await tx.delete(snippets).where(eq(snippets.id, id));
+    });
   }
 
   async incrementSnippetViewCount(id: number): Promise<void> {
@@ -219,21 +215,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async toggleSnippetFavorite(id: number): Promise<Snippet> {
-    const existing = await this.getSnippet(id);
-    if (!existing) {
-      throw new Error(`Snippet with id ${id} not found`);
-    }
-
-    const result = await db
+    const [row] = await db
       .update(snippets)
-      .set({ isFavorite: !existing.isFavorite, updatedAt: new Date() })
+      .set({
+        isFavorite: sql`NOT COALESCE(${snippets.isFavorite}, false)`,
+        updatedAt: new Date(),
+      })
       .where(eq(snippets.id, id))
       .returning();
 
-    return result[0];
+    if (!row) {
+      throw new Error(`Snippet with id ${id} not found`);
+    }
+    return row;
   }
 
-  // ─── Languages & Tags ────────────────────────────────────────
+  // ─── Languages & Tags ─────────────────────────────────────────
 
   /** Public snippets, plus the given user's own. */
   private visibleTo(userId?: string) {
@@ -251,15 +248,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTags(userId?: string): Promise<string[]> {
-    const allTags = await db
+    const rows = await db
       .select({ tags: snippets.tags })
       .from(snippets)
       .where(and(isNotNull(snippets.tags), this.visibleTo(userId)));
 
     const uniqueTags = new Set<string>();
-    allTags.forEach((row) => {
+    for (const row of rows) {
       row.tags?.forEach((tag) => uniqueTags.add(tag));
-    });
+    }
     return Array.from(uniqueTags).sort();
   }
 
@@ -267,37 +264,43 @@ export class DatabaseStorage implements IStorage {
 
   async getCollections(userId?: string): Promise<Collection[]> {
     if (userId) {
-      return await db.select().from(collections).where(eq(collections.userId, userId));
+      return db.select().from(collections).where(eq(collections.userId, userId));
     }
-    return await db.select().from(collections);
+    return db.select().from(collections);
   }
 
   async getCollection(id: number): Promise<Collection | undefined> {
-    const result = await db.select().from(collections).where(eq(collections.id, id)).limit(1);
-    return result[0];
+    const [row] = await db.select().from(collections).where(eq(collections.id, id)).limit(1);
+    return row;
   }
 
   async createCollection(collection: InsertCollection): Promise<Collection> {
-    const result = await db.insert(collections).values(collection).returning();
-    return result[0];
+    const [row] = await db.insert(collections).values(collection).returning();
+    return row;
   }
 
-  async updateCollection(id: number, collection: InsertCollection): Promise<Collection> {
-    const result = await db
+  async updateCollection(id: number, collection: Omit<InsertCollection, "userId">): Promise<Collection> {
+    const [row] = await db
       .update(collections)
-      .set({ ...collection, updatedAt: new Date() })
+      .set({
+        name: collection.name,
+        description: collection.description ?? null,
+        updatedAt: new Date(),
+      })
       .where(eq(collections.id, id))
       .returning();
 
-    if (!result[0]) {
+    if (!row) {
       throw new Error(`Collection with id ${id} not found`);
     }
-    return result[0];
+    return row;
   }
 
   async deleteCollection(id: number): Promise<void> {
-    await db.delete(collectionItems).where(eq(collectionItems.collectionId, id));
-    await db.delete(collections).where(eq(collections.id, id));
+    await db.transaction(async (tx) => {
+      await tx.delete(collectionItems).where(eq(collectionItems.collectionId, id));
+      await tx.delete(collections).where(eq(collections.id, id));
+    });
   }
 
   async getCollectionSnippets(collectionId: number): Promise<Snippet[]> {
@@ -311,27 +314,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addSnippetToCollection(collectionItem: InsertCollectionItem): Promise<CollectionItem> {
-    const existing = await db
+    const [existing] = await db
       .select()
       .from(collectionItems)
       .where(
         and(
           eq(collectionItems.collectionId, collectionItem.collectionId),
-          eq(collectionItems.snippetId, collectionItem.snippetId)
-        )
+          eq(collectionItems.snippetId, collectionItem.snippetId),
+        ),
       )
       .limit(1);
 
-    if (existing.length > 0) {
-      return existing[0];
+    if (existing) {
+      return existing;
     }
 
-    const result = await db
-      .insert(collectionItems)
-      .values(collectionItem)
-      .returning();
-
-    return result[0];
+    const [row] = await db.insert(collectionItems).values(collectionItem).returning();
+    return row;
   }
 
   async removeSnippetFromCollection(collectionId: number, snippetId: number): Promise<void> {
@@ -340,28 +339,21 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(collectionItems.collectionId, collectionId),
-          eq(collectionItems.snippetId, snippetId)
-        )
+          eq(collectionItems.snippetId, snippetId),
+        ),
       );
   }
 
   // ─── Sharing ──────────────────────────────────────────────────
 
   async getSnippetByShareId(shareId: string): Promise<Snippet | undefined> {
-    const result = await db
-      .select()
-      .from(snippets)
-      .where(eq(snippets.shareId, shareId))
-      .limit(1);
-    return result[0];
+    const [row] = await db.select().from(snippets).where(eq(snippets.shareId, shareId)).limit(1);
+    return row;
   }
 
   async generateShareId(snippetId: number): Promise<string> {
     const shareId = newShareId();
-    await db
-      .update(snippets)
-      .set({ shareId })
-      .where(eq(snippets.id, snippetId));
+    await db.update(snippets).set({ shareId }).where(eq(snippets.id, snippetId));
     return shareId;
   }
 
@@ -372,10 +364,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const isPublic = !current.isPublic;
-    let shareId = current.shareId;
-    if (isPublic && !shareId) {
-      shareId = newShareId();
-    }
+    const shareId = isPublic && !current.shareId ? newShareId() : current.shareId;
 
     const [updated] = await db
       .update(snippets)
@@ -389,12 +378,8 @@ export class DatabaseStorage implements IStorage {
   // ─── Comments ─────────────────────────────────────────────────
 
   async getComment(id: number): Promise<Comment | undefined> {
-    const result = await db
-      .select()
-      .from(comments)
-      .where(eq(comments.id, id))
-      .limit(1);
-    return result[0];
+    const [row] = await db.select().from(comments).where(eq(comments.id, id)).limit(1);
+    return row;
   }
 
   async getCommentsBySnippetId(snippetId: number): Promise<Comment[]> {
@@ -406,10 +391,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createComment(comment: InsertComment): Promise<Comment> {
-    const [newComment] = await db
-      .insert(comments)
-      .values(comment)
-      .returning();
+    const [newComment] = await db.insert(comments).values(comment).returning();
     return newComment;
   }
 

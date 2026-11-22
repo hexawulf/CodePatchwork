@@ -9,27 +9,25 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import logger from "./logger";
-import "./logger.ts"; // force esbuild to preserve it
 
 if (process.env.NODE_ENV === "production") {
   console.log = () => {};
 }
 
-logger.info("Winston logger loaded");
-
 /* ── 1. Firebase Admin setup ──────────────────────────────────── */
-const svcPath = path.resolve(
-  process.cwd(),
-  process.env.GOOGLE_APPLICATION_CREDENTIALS!
-);
+const credentialsEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+if (!credentialsEnv) {
+  logger.error("GOOGLE_APPLICATION_CREDENTIALS is not set. Aborting.");
+  process.exit(1);
+}
+
+const svcPath = path.resolve(process.cwd(), credentialsEnv);
 if (!fs.existsSync(svcPath)) {
   logger.error(`Service account JSON not found at ${svcPath}. Aborting.`);
   process.exit(1);
 }
 
-const serviceAccount = JSON.parse(
-  fs.readFileSync(svcPath, { encoding: "utf-8" })
-);
+const serviceAccount = JSON.parse(fs.readFileSync(svcPath, { encoding: "utf-8" }));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -37,43 +35,50 @@ admin.initializeApp({
 
 /* ── 2. Express setup ─────────────────────────────────────────── */
 const app = express();
+app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
 
 /* ── 3. Helmet security headers ───────────────────────────────── */
+const frameSrc = [
+  "https://accounts.google.com",
+  "https://*.firebaseapp.com",
+  ...(process.env.VITE_FIREBASE_AUTH_DOMAIN
+    ? [`https://${process.env.VITE_FIREBASE_AUTH_DOMAIN}`]
+    : []),
+];
+
 app.use(
-  helmet.crossOriginOpenerPolicy({ policy: "unsafe-none" }),
-  helmet.crossOriginEmbedderPolicy({ policy: "unsafe-none" }),
-  helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "'unsafe-eval'",
-        "https://www.gstatic.com",
-        "https://apis.google.com",
-        "https://*.firebaseio.com",
-        "https://*.firebaseapp.com",
-      ],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      connectSrc: [
-        "'self'",
-        "https://identitytoolkit.googleapis.com",
-        "https://securetoken.googleapis.com",
-        "https://www.googleapis.com",
-        "https://*.firebaseio.com",
-        "https://*.firebaseapp.com",
-      ],
-      frameSrc: [
-        "https://accounts.google.com",
-        `https://${process.env.VITE_FIREBASE_AUTH_DOMAIN}`,
-        "https://*.firebaseapp.com",
-      ],
-      imgSrc: ["'self'", "data:", "https://*.googleusercontent.com"],
+  helmet({
+    crossOriginOpenerPolicy: { policy: "unsafe-none" },
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          "https://www.gstatic.com",
+          "https://apis.google.com",
+          "https://*.firebaseio.com",
+          "https://*.firebaseapp.com",
+        ],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        connectSrc: [
+          "'self'",
+          "https://identitytoolkit.googleapis.com",
+          "https://securetoken.googleapis.com",
+          "https://www.googleapis.com",
+          "https://*.firebaseio.com",
+          "https://*.firebaseapp.com",
+        ],
+        frameSrc,
+        imgSrc: ["'self'", "data:", "https://*.googleusercontent.com"],
+      },
     },
-  })
+  }),
 );
 
 /* ── 4. Ensure API responses are always JSON ──────────────────── */
@@ -98,13 +103,14 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: Error & { status?: number }, req: Request, res: Response, _next: NextFunction) => {
     logger.error(`${req.method} ${req.path}:`, err.stack || err);
     if (!res.headersSent) {
       res.status(err.status || 500).json({
-        message: process.env.NODE_ENV === "production"
-          ? "Internal server error"
-          : err.message || "Internal server error",
+        message:
+          process.env.NODE_ENV === "production"
+            ? "Internal server error"
+            : err.message || "Internal server error",
       });
     }
   });
