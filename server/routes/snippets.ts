@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { z } from "zod";
 import { insertSnippetSchema } from "@shared/schema";
 import { storage } from "../storage";
+import logger from "../logger";
 import { authMiddleware, optionalAuthMiddleware } from "../middleware/auth";
 import {
   HttpError,
@@ -10,6 +11,7 @@ import {
   canViewSnippet,
   parseId,
   requireOwnedSnippet,
+  snippetFilename,
 } from "./helpers";
 
 const tagsInputSchema = z
@@ -31,6 +33,12 @@ const createSnippetSchema = z.object({
 });
 
 const updateSnippetSchema = insertSnippetSchema.omit({ userId: true });
+
+function bumpViewCount(id: number): void {
+  storage.incrementSnippetViewCount(id).catch((err: unknown) => {
+    logger.warn(`Failed to increment view count for snippet ${id}:`, err instanceof Error ? err.message : String(err));
+  });
+}
 
 export function registerSnippetRoutes(app: Express): void {
   // ─── Authenticated Snippets ───────────────────────────────────
@@ -84,7 +92,11 @@ export function registerSnippetRoutes(app: Express): void {
       for (let i = 0; i < snippets.length; i++) {
         const s = snippets[i];
         if (!s || typeof s.title !== "string" || !s.title.trim() || typeof s.code !== "string" || !s.code) {
-          failed.push({ index: i, title: typeof s?.title === "string" && s.title ? s.title : "untitled", reason: "Missing required fields" });
+          failed.push({
+            index: i,
+            title: typeof s?.title === "string" && s.title ? s.title : "untitled",
+            reason: "Missing required fields",
+          });
           continue;
         }
         try {
@@ -93,14 +105,20 @@ export function registerSnippetRoutes(app: Express): void {
             code: s.code,
             language: typeof s.language === "string" && s.language ? s.language : "text",
             description: typeof s.description === "string" && s.description ? s.description : null,
-            tags: Array.isArray(s.tags) ? s.tags.filter((t: unknown): t is string => typeof t === "string") : null,
+            tags: Array.isArray(s.tags)
+              ? s.tags.filter((t: unknown): t is string => typeof t === "string")
+              : null,
             userId,
             isFavorite: s.isFavorite === true,
             isPublic: s.isPublic === true,
           });
           success.push({ id: created.id, title: created.title });
         } catch (err: unknown) {
-          failed.push({ index: i, title: s.title, reason: err instanceof Error ? err.message : String(err) });
+          failed.push({
+            index: i,
+            title: s.title,
+            reason: err instanceof Error ? err.message : String(err),
+          });
         }
       }
 
@@ -120,8 +138,22 @@ export function registerSnippetRoutes(app: Express): void {
       if (!snippet || !canViewSnippet(snippet, req.user)) {
         throw new HttpError(404, "Snippet not found");
       }
-      await storage.incrementSnippetViewCount(id);
+      bumpViewCount(id);
       res.json(snippet);
+    }),
+  );
+
+  app.get(
+    "/api/snippets/:id/collections",
+    authMiddleware,
+    asyncHandler("GET /api/snippets/:id/collections", "Failed to fetch snippet collections", async (req, res) => {
+      const id = parseId(req.params.id);
+      const snippet = await storage.getSnippet(id);
+      if (!snippet || !canViewSnippet(snippet, req.user)) {
+        throw new HttpError(404, "Snippet not found");
+      }
+      const collectionIds = await storage.getSnippetCollectionIds(id, req.user!.id);
+      res.json({ collectionIds });
     }),
   );
 
@@ -206,12 +238,26 @@ export function registerSnippetRoutes(app: Express): void {
   );
 
   app.get(
+    "/api/shared/:shareId/raw",
+    asyncHandler("GET /api/shared/:shareId/raw", "Failed to fetch raw shared snippet", async (req, res) => {
+      const snippet = await storage.getSnippetByShareId(req.params.shareId);
+      if (!snippet) throw new HttpError(404, "Not found");
+      if (!snippet.isPublic) throw new HttpError(403, "Forbidden");
+      bumpViewCount(snippet.id);
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Content-Disposition", `inline; filename="${snippetFilename(snippet.title, snippet.language)}"`);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.send(snippet.code);
+    }),
+  );
+
+  app.get(
     "/api/shared/:shareId",
     asyncHandler("GET /api/shared/:shareId", "Failed to fetch shared snippet", async (req, res) => {
       const snippet = await storage.getSnippetByShareId(req.params.shareId);
       if (!snippet) throw new HttpError(404, "Not found");
       if (!snippet.isPublic) throw new HttpError(403, "Forbidden");
-      await storage.incrementSnippetViewCount(snippet.id);
+      bumpViewCount(snippet.id);
       res.json(snippet);
     }),
   );
@@ -240,7 +286,16 @@ export function registerSnippetRoutes(app: Express): void {
     }),
   );
 
-  // ─── Languages & Tags ─────────────────────────────────────────
+  // ─── Languages, Tags & Library Meta ───────────────────────────
+
+  app.get(
+    "/api/meta",
+    optionalAuthMiddleware,
+    asyncHandler("GET /api/meta", "Failed to fetch library metadata", async (req, res) => {
+      const meta = await storage.getMeta(req.user?.id);
+      res.json(meta);
+    }),
+  );
 
   app.get(
     "/api/languages",

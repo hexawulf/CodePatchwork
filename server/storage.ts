@@ -1,9 +1,10 @@
 import {
   users, type User, type InsertUser,
   snippets, type Snippet, type InsertSnippet,
-  collections, type Collection, type InsertCollection,
+  collections, type Collection, type CollectionWithCount, type InsertCollection,
   collectionItems, type CollectionItem, type InsertCollectionItem,
   comments, type Comment, type InsertComment,
+  type LibraryMeta,
 } from "@shared/schema";
 import { eq, and, or, inArray, isNotNull, ilike, sql, desc, asc } from "drizzle-orm";
 import { randomBytes } from "crypto";
@@ -26,6 +27,8 @@ export interface SnippetFilters {
   favorites?: boolean;
   isPublic?: boolean;
   userId?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface IStorage {
@@ -44,14 +47,16 @@ export interface IStorage {
 
   getLanguages(userId?: string): Promise<string[]>;
   getTags(userId?: string): Promise<string[]>;
+  getMeta(userId?: string): Promise<LibraryMeta>;
 
-  getCollections(userId?: string): Promise<Collection[]>;
+  getCollections(userId?: string): Promise<CollectionWithCount[]>;
   getCollection(id: number): Promise<Collection | undefined>;
   createCollection(collection: InsertCollection): Promise<Collection>;
   updateCollection(id: number, collection: Omit<InsertCollection, "userId">): Promise<Collection>;
   deleteCollection(id: number): Promise<void>;
 
   getCollectionSnippets(collectionId: number): Promise<Snippet[]>;
+  getSnippetCollectionIds(snippetId: number, userId: string): Promise<number[]>;
   addSnippetToCollection(collectionItem: InsertCollectionItem): Promise<CollectionItem>;
   removeSnippetFromCollection(collectionId: number, snippetId: number): Promise<void>;
 
@@ -122,7 +127,13 @@ export class DatabaseStorage implements IStorage {
 
     if (filters?.search) {
       const pattern = `%${escapeLike(filters.search)}%`;
-      conditions.push(or(ilike(snippets.title, pattern), ilike(snippets.code, pattern)));
+      conditions.push(
+        or(
+          ilike(snippets.title, pattern),
+          ilike(snippets.description, pattern),
+          ilike(snippets.code, pattern),
+        ),
+      );
     }
 
     if (filters?.tag) {
@@ -147,11 +158,20 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(snippets.isPublic, filters.isPublic));
     }
 
-    if (conditions.length > 0) {
-      return db.select().from(snippets).where(and(...conditions)).orderBy(desc(snippets.updatedAt));
-    }
+    const base = db.select().from(snippets);
+    const filtered = conditions.length > 0 ? base.where(and(...conditions)) : base;
+    const ordered = filtered.orderBy(desc(snippets.updatedAt));
 
-    return db.select().from(snippets).orderBy(desc(snippets.updatedAt));
+    if (filters?.limit !== undefined && filters?.offset !== undefined) {
+      return ordered.limit(filters.limit).offset(filters.offset);
+    }
+    if (filters?.limit !== undefined) {
+      return ordered.limit(filters.limit);
+    }
+    if (filters?.offset !== undefined) {
+      return ordered.offset(filters.offset);
+    }
+    return ordered;
   }
 
   async getSnippet(id: number): Promise<Snippet | undefined> {
@@ -230,7 +250,7 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  // ─── Languages & Tags ─────────────────────────────────────────
+  // ─── Languages, Tags & Meta ───────────────────────────────────
 
   /** Public snippets, plus the given user's own. */
   private visibleTo(userId?: string) {
@@ -260,13 +280,85 @@ export class DatabaseStorage implements IStorage {
     return Array.from(uniqueTags).sort();
   }
 
+  /** Aggregated counts for the sidebar & filter bar. */
+  async getMeta(userId?: string): Promise<LibraryMeta> {
+    const scope = userId ? eq(snippets.userId, userId) : eq(snippets.isPublic, true);
+
+    const rows = await db
+      .select({
+        language: snippets.language,
+        tags: snippets.tags,
+        isFavorite: snippets.isFavorite,
+        isPublic: snippets.isPublic,
+      })
+      .from(snippets)
+      .where(scope);
+
+    const langCounts = new Map<string, number>();
+    const tagCounts = new Map<string, number>();
+    let favorites = 0;
+    let publicCount = 0;
+
+    for (const row of rows) {
+      if (row.language) {
+        langCounts.set(row.language, (langCounts.get(row.language) ?? 0) + 1);
+      }
+      if (row.tags) {
+        for (const tag of row.tags) {
+          if (tag) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+        }
+      }
+      if (row.isFavorite) favorites++;
+      if (row.isPublic) publicCount++;
+    }
+
+    let collectionCount = 0;
+    if (userId) {
+      const [colRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(collections)
+        .where(eq(collections.userId, userId));
+      collectionCount = colRow?.count ?? 0;
+    }
+
+    const languages = Array.from(langCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+    const tags = Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+    return {
+      languages,
+      tags,
+      counts: {
+        total: rows.length,
+        favorites,
+        public: publicCount,
+        collections: collectionCount,
+      },
+    };
+  }
+
   // ─── Collections ──────────────────────────────────────────────
 
-  async getCollections(userId?: string): Promise<Collection[]> {
-    if (userId) {
-      return db.select().from(collections).where(eq(collections.userId, userId));
-    }
-    return db.select().from(collections);
+  async getCollections(userId?: string): Promise<CollectionWithCount[]> {
+    const base = db
+      .select({
+        id: collections.id,
+        name: collections.name,
+        description: collections.description,
+        userId: collections.userId,
+        createdAt: collections.createdAt,
+        updatedAt: collections.updatedAt,
+        snippetCount: sql<number>`count(${collectionItems.id})::int`,
+      })
+      .from(collections)
+      .leftJoin(collectionItems, eq(collections.id, collectionItems.collectionId));
+
+    const query = userId ? base.where(eq(collections.userId, userId)) : base;
+    return query.groupBy(collections.id).orderBy(desc(collections.updatedAt));
   }
 
   async getCollection(id: number): Promise<Collection | undefined> {
@@ -308,9 +400,19 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(snippets)
       .innerJoin(collectionItems, eq(snippets.id, collectionItems.snippetId))
-      .where(eq(collectionItems.collectionId, collectionId));
+      .where(eq(collectionItems.collectionId, collectionId))
+      .orderBy(desc(snippets.updatedAt));
 
     return result.map((row) => ({ ...row.snippets }));
+  }
+
+  async getSnippetCollectionIds(snippetId: number, userId: string): Promise<number[]> {
+    const rows = await db
+      .select({ collectionId: collectionItems.collectionId })
+      .from(collectionItems)
+      .innerJoin(collections, eq(collections.id, collectionItems.collectionId))
+      .where(and(eq(collectionItems.snippetId, snippetId), eq(collections.userId, userId)));
+    return rows.map((r) => r.collectionId);
   }
 
   async addSnippetToCollection(collectionItem: InsertCollectionItem): Promise<CollectionItem> {

@@ -37,6 +37,13 @@ export function queryStrings(value: unknown): string | string[] | undefined {
   return undefined;
 }
 
+function parseBoundedInt(value: unknown, min: number, max: number): number | undefined {
+  if (typeof value !== "string" || !/^[0-9]+$/.test(value)) return undefined;
+  const num = Number(value);
+  if (!Number.isSafeInteger(num)) return undefined;
+  return Math.min(Math.max(num, min), max);
+}
+
 /** Build validated snippet filters from Express query params. */
 export function buildSnippetFilters(
   query: Request["query"],
@@ -51,12 +58,60 @@ export function buildSnippetFilters(
   const tag = queryStrings(query.tag);
   if (tag) filters.tag = tag;
   if (query.favorites === "true") filters.favorites = true;
+  if (base.isPublic === undefined) {
+    if (query.visibility === "public") filters.isPublic = true;
+    if (query.visibility === "private") filters.isPublic = false;
+  }
+  const limit = parseBoundedInt(query.limit, 1, 500);
+  if (limit !== undefined) filters.limit = limit;
+  const offset = parseBoundedInt(query.offset, 0, 100000);
+  if (offset !== undefined) filters.offset = offset;
   return filters;
 }
 
 /** Owner always; anyone else only when the snippet is public. */
 export function canViewSnippet(snippet: Snippet, user: User | undefined): boolean {
   return snippet.isPublic === true || (!!user && snippet.userId === user.id);
+}
+
+const LANGUAGE_EXT: Record<string, string> = {
+  javascript: "js",
+  typescript: "ts",
+  jsx: "jsx",
+  tsx: "tsx",
+  python: "py",
+  java: "java",
+  csharp: "cs",
+  cpp: "cpp",
+  php: "php",
+  go: "go",
+  ruby: "rb",
+  swift: "swift",
+  kotlin: "kt",
+  rust: "rs",
+  html: "html",
+  css: "css",
+  scss: "scss",
+  sql: "sql",
+  json: "json",
+  yaml: "yml",
+  markdown: "md",
+  bash: "sh",
+  powershell: "ps1",
+  docker: "Dockerfile",
+  graphql: "graphql",
+};
+
+/** Safe ASCII download filename derived from snippet title and language. */
+export function snippetFilename(title: string, language?: string | null): string {
+  const slug =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "snippet";
+  const ext = LANGUAGE_EXT[(language ?? "").toLowerCase()] ?? "txt";
+  return ext === "Dockerfile" ? "Dockerfile" : `${slug}.${ext}`;
 }
 
 /** Wrap an async route handler with consistent Zod / HttpError / 500 handling. */
