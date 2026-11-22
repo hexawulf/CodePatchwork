@@ -3,7 +3,7 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signOut as firebaseSignOut,
-} from "firebase/auth";
+} from "@firebase/auth";
 import { auth, googleProvider } from "./firebase";
 
 export interface AppUser {

@@ -128,7 +128,7 @@ export function asyncHandler(
         return res.status(err.status).json({ message: err.message });
       }
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: err.errors });
+        return res.status(400).json({ message: "Invalid data", errors: err.issues });
       }
       const message = err instanceof Error ? err.message : String(err);
       logger.error(`${label} error:`, message);

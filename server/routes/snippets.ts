@@ -27,7 +27,7 @@ const createSnippetSchema = z.object({
   code: z.string().min(1, "Code is required"),
   language: z.string().trim().min(1).optional().default("text"),
   description: z.string().nullable().optional(),
-  tags: tagsInputSchema,
+  tags: tagsInputSchema.optional().default(null),
   isFavorite: z.boolean().optional().default(false),
   isPublic: z.boolean().optional().default(false),
 });
@@ -163,7 +163,7 @@ export function registerSnippetRoutes(app: Express): void {
     asyncHandler("POST /api/snippets", "Failed to create snippet", async (req, res) => {
       const parsed = createSnippetSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ message: "Title and code are required", errors: parsed.error.errors });
+        return res.status(400).json({ message: "Title and code are required", errors: parsed.error.issues });
       }
       const snippet = await storage.createSnippet({
         title: parsed.data.title,

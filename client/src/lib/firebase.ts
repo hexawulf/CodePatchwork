@@ -1,5 +1,5 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { initializeApp, getApps, getApp } from "@firebase/app";
+import { getAuth, GoogleAuthProvider } from "@firebase/auth";
 
 const {
   VITE_FIREBASE_API_KEY,

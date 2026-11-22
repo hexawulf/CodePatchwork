@@ -16,18 +16,16 @@ const state = vi.hoisted(() => ({
   nextId: 100,
 }));
 
-vi.mock("firebase-admin", () => ({
-  default: {
-    auth: () => ({
-      verifyIdToken: async (token: string) => {
-        if (typeof token !== "string" || !token.startsWith("token-")) {
-          throw new Error("bad token");
-        }
-        const uid = token.slice("token-".length);
-        return { uid, email: `${uid}@example.test`, name: uid, picture: null };
-      },
-    }),
-  },
+vi.mock("firebase-admin/auth", () => ({
+  getAuth: () => ({
+    verifyIdToken: async (token: string) => {
+      if (typeof token !== "string" || !token.startsWith("token-")) {
+        throw new Error("bad token");
+      }
+      const uid = token.slice("token-".length);
+      return { uid, email: `${uid}@example.test`, name: uid, picture: null };
+    },
+  }),
 }));
 
 vi.mock("../logger", () => ({

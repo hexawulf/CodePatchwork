@@ -1,5 +1,5 @@
 import type { Request, RequestHandler } from "express";
-import admin from "firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 import type { User } from "@shared/schema";
 import { storage } from "../storage";
 import logger from "../logger";
@@ -29,7 +29,7 @@ export const authMiddleware: RequestHandler = async (req, res, next) => {
     if (!idToken) {
       return res.status(401).json({ message: "Unauthorized: No token" });
     }
-    const decoded = await admin.auth().verifyIdToken(idToken);
+    const decoded = await getAuth().verifyIdToken(idToken);
     const user = await storage.getUser(decoded.uid);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -48,7 +48,7 @@ export const optionalAuthMiddleware: RequestHandler = async (req, _res, next) =>
   try {
     const idToken = extractBearerToken(req);
     if (idToken) {
-      const decoded = await admin.auth().verifyIdToken(idToken);
+      const decoded = await getAuth().verifyIdToken(idToken);
       const user = await storage.getUser(decoded.uid);
       if (user) {
         req.user = user;

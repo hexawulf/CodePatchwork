@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import admin from "firebase-admin";
+import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
 import { storage } from "../storage";
 import logger from "../logger";
 import { authMiddleware } from "../middleware/auth";
@@ -13,9 +13,9 @@ export function registerAuthRoutes(app: Express): void {
       return res.status(400).json({ message: "Missing idToken in request body" });
     }
 
-    let decoded: Awaited<ReturnType<ReturnType<typeof admin.auth>["verifyIdToken"]>>;
+    let decoded: DecodedIdToken;
     try {
-      decoded = await admin.auth().verifyIdToken(idToken);
+      decoded = await getAuth().verifyIdToken(idToken);
     } catch (err: unknown) {
       logger.error("/api/auth/user token error:", err instanceof Error ? err.message : String(err));
       return res.status(401).json({ message: "Unauthorized: Invalid token" });

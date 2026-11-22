@@ -3,7 +3,7 @@ dotenv.config();
 
 import fs from "fs";
 import path from "path";
-import admin from "firebase-admin";
+import { initializeApp, cert } from "firebase-admin/app";
 import express, { Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import { registerRoutes } from "./routes";
@@ -29,8 +29,8 @@ if (!fs.existsSync(svcPath)) {
 
 const serviceAccount = JSON.parse(fs.readFileSync(svcPath, { encoding: "utf-8" }));
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+initializeApp({
+  credential: cert(serviceAccount),
 });
 
 /* ── 2. Express setup ─────────────────────────────────────────── */
