@@ -44,12 +44,17 @@ vi.mock("../storage", () => {
       state.users.set(u.id, row);
       return row;
     },
-    getSnippets: async (f: any = {}) =>
-      [...state.snippets.values()].filter(
+    getSnippets: async (f: any = {}) => {
+      let list = [...state.snippets.values()].filter(
         (s) =>
           (f.userId === undefined || s.userId === f.userId) &&
-          (f.isPublic === undefined || s.isPublic === f.isPublic),
-      ),
+          (f.isPublic === undefined || s.isPublic === f.isPublic) &&
+          (!f.favorites || s.isFavorite === true),
+      );
+      if (f.offset) list = list.slice(f.offset);
+      if (f.limit !== undefined) list = list.slice(0, f.limit);
+      return list;
+    },
     getSnippet: async (id: number) => state.snippets.get(id),
     createSnippet: async (s: any) => {
       const row = { id: state.nextId++, isPublic: false, isFavorite: false, shareId: null, ...s };
@@ -86,8 +91,34 @@ vi.mock("../storage", () => {
       [...new Set([...state.snippets.values()].filter((s) => visible(s, userId)).map((s) => s.language))].sort(),
     getTags: async (userId?: string) =>
       [...new Set([...state.snippets.values()].filter((s) => visible(s, userId)).flatMap((s) => s.tags ?? []))].sort(),
+    getMeta: async (userId?: string) => {
+      const rows = [...state.snippets.values()].filter((s) =>
+        userId ? s.userId === userId : s.isPublic === true,
+      );
+      const langMap = new Map<string, number>();
+      const tagMap = new Map<string, number>();
+      for (const r of rows) {
+        langMap.set(r.language, (langMap.get(r.language) ?? 0) + 1);
+        for (const t of r.tags ?? []) tagMap.set(t, (tagMap.get(t) ?? 0) + 1);
+      }
+      return {
+        languages: [...langMap.entries()].map(([name, count]) => ({ name, count })),
+        tags: [...tagMap.entries()].map(([name, count]) => ({ name, count })),
+        counts: {
+          total: rows.length,
+          favorites: rows.filter((r) => r.isFavorite).length,
+          public: rows.filter((r) => r.isPublic).length,
+          collections: userId ? [...state.collections.values()].filter((c) => c.userId === userId).length : 0,
+        },
+      };
+    },
     getCollections: async (userId: string) =>
-      [...state.collections.values()].filter((c) => c.userId === userId),
+      [...state.collections.values()]
+        .filter((c) => c.userId === userId)
+        .map((c) => ({
+          ...c,
+          snippetCount: state.items.filter((i) => i.collectionId === c.id).length,
+        })),
     getCollection: async (id: number) => state.collections.get(id),
     createCollection: async (c: any) => {
       const row = { id: state.nextId++, ...c };
@@ -105,6 +136,10 @@ vi.mock("../storage", () => {
         .filter((i) => i.collectionId === collectionId)
         .map((i) => state.snippets.get(i.snippetId))
         .filter(Boolean),
+    getSnippetCollectionIds: async (snippetId: number, userId: string) =>
+      state.items
+        .filter((i) => i.snippetId === snippetId && state.collections.get(i.collectionId)?.userId === userId)
+        .map((i) => i.collectionId),
     addSnippetToCollection: async (item: any) => {
       state.items.push(item);
       return { id: state.nextId++, ...item };
@@ -129,6 +164,7 @@ vi.mock("../storage", () => {
 });
 
 import { registerRoutes } from "../routes";
+import { injectShareMeta } from "../vite";
 
 const ALICE = { Authorization: "Bearer token-alice" };
 const BOB = { Authorization: "Bearer token-bob" };
@@ -152,7 +188,7 @@ beforeEach(() => {
   state.users.set("bob", { id: "bob", email: "bob@example.test", displayName: "Bob" });
 
   // 1: alice private, 2: alice public, 3: bob private
-  state.snippets.set(1, { id: 1, title: "a-private", code: "secret()", language: "python", tags: ["alice-secret-tag"], userId: "alice", isPublic: false, isFavorite: false, shareId: "priv-share" });
+  state.snippets.set(1, { id: 1, title: "a-private", code: "secret()", language: "python", tags: ["alice-secret-tag"], userId: "alice", isPublic: false, isFavorite: true, shareId: "priv-share" });
   state.snippets.set(2, { id: 2, title: "a-public", code: "hello()", language: "go", tags: ["shared-tag"], userId: "alice", isPublic: true, isFavorite: false, shareId: "pub-share" });
   state.snippets.set(3, { id: 3, title: "b-private", code: "bob()", language: "rust", tags: ["bob-tag"], userId: "bob", isPublic: false, isFavorite: false, shareId: null });
 
@@ -247,6 +283,17 @@ describe("collections and private snippets (CP-02)", () => {
     expect((await request(app).delete("/api/collections/10").set(ALICE)).status).toBe(204);
     expect(state.collections.has(10)).toBe(false);
   });
+
+  it("GET /api/snippets/:id/collections returns caller membership and hides private snippets", async () => {
+    state.items.push({ collectionId: 10, snippetId: 1 }, { collectionId: 11, snippetId: 2 });
+    const app = await makeApp();
+    const own = await request(app).get("/api/snippets/1/collections").set(ALICE);
+    expect(own.status).toBe(200);
+    expect(own.body).toEqual({ collectionIds: [10] });
+
+    const forbidden = await request(app).get("/api/snippets/1/collections").set(BOB);
+    expect(forbidden.status).toBe(404);
+  });
 });
 
 describe("comments (CP-03)", () => {
@@ -324,7 +371,7 @@ describe("GET /api/snippets/export (CP-04)", () => {
   });
 });
 
-describe("snippet CRUD, import, favorite, share, and visibility", () => {
+describe("snippet CRUD, import, favorite, share, raw, meta, and visibility", () => {
   it("create and import keep isPublic (CP-05, route level)", async () => {
     const app = await makeApp();
     const created = await request(app)
@@ -371,12 +418,27 @@ describe("snippet CRUD, import, favorite, share, and visibility", () => {
     expect(res.body.failed).toHaveLength(1);
   });
 
+  it("supports visibility and pagination filters on GET /api/snippets", async () => {
+    const app = await makeApp();
+    const pub = await request(app).get("/api/snippets?visibility=public").set(ALICE);
+    expect(pub.status).toBe(200);
+    expect(pub.body.map((s: any) => s.id)).toEqual([2]);
+
+    const priv = await request(app).get("/api/snippets?visibility=private").set(ALICE);
+    expect(priv.status).toBe(200);
+    expect(priv.body.map((s: any) => s.id)).toEqual([1]);
+
+    const paged = await request(app).get("/api/snippets?limit=1&offset=1").set(ALICE);
+    expect(paged.status).toBe(200);
+    expect(paged.body).toHaveLength(1);
+  });
+
   it("favorite, share, and publish enforce ownership and work for owner", async () => {
     const app = await makeApp();
     expect((await request(app).post("/api/snippets/1/favorite").set(BOB)).status).toBe(403);
     const fav = await request(app).post("/api/snippets/1/favorite").set(ALICE);
     expect(fav.status).toBe(200);
-    expect(fav.body.isFavorite).toBe(true);
+    expect(fav.body.isFavorite).toBe(false);
 
     expect((await request(app).post("/api/snippets/3/share").set(ALICE)).status).toBe(403);
     const shared = await request(app).post("/api/snippets/3/share").set(BOB);
@@ -389,11 +451,31 @@ describe("snippet CRUD, import, favorite, share, and visibility", () => {
     expect(pub.body.isPublic).toBe(true);
   });
 
-  it("GET /api/shared/:shareId enforces visibility", async () => {
+  it("GET /api/shared/:shareId and /raw enforce visibility and return text/plain", async () => {
     const app = await makeApp();
     expect((await request(app).get("/api/shared/pub-share")).status).toBe(200);
     expect((await request(app).get("/api/shared/priv-share")).status).toBe(403);
     expect((await request(app).get("/api/shared/nope")).status).toBe(404);
+
+    const raw = await request(app).get("/api/shared/pub-share/raw");
+    expect(raw.status).toBe(200);
+    expect(raw.headers["content-type"]).toContain("text/plain");
+    expect(raw.headers["content-disposition"]).toContain('filename="a-public.go"');
+    expect(raw.text).toBe("hello()");
+
+    expect((await request(app).get("/api/shared/priv-share/raw")).status).toBe(403);
+    expect((await request(app).get("/api/shared/nope/raw")).status).toBe(404);
+  });
+
+  it("GET /api/meta returns scoped counts for anonymous and signed-in users", async () => {
+    const app = await makeApp();
+    const anon = await request(app).get("/api/meta");
+    expect(anon.status).toBe(200);
+    expect(anon.body.counts).toEqual({ total: 1, favorites: 0, public: 1, collections: 0 });
+
+    const alice = await request(app).get("/api/meta").set(ALICE);
+    expect(alice.status).toBe(200);
+    expect(alice.body.counts).toEqual({ total: 2, favorites: 1, public: 1, collections: 1 });
   });
 
   it("a private snippet is 404 for others and for anonymous callers", async () => {
@@ -411,6 +493,16 @@ describe("snippet CRUD, import, favorite, share, and visibility", () => {
       (await request(app).put("/api/snippets/1").set(BOB).send({ title: "x", code: "y", language: "js" })).status,
     ).toBe(403);
     expect(state.snippets.get(1).title).toBe("a-private");
+  });
+});
+
+describe("OpenGraph meta injection", () => {
+  it("escapes HTML attributes when injecting shared snippet metadata", () => {
+    const html =
+      '<title>Old</title><meta property="og:title" content="Old"><meta property="og:description" content="Desc">';
+    const out = injectShareMeta(html, 'A "quote" & <tag>', 'Use <b>now</b>');
+    expect(out).toContain("<title>A &quot;quote&quot; &amp; &lt;tag&gt; — CodePatchwork</title>");
+    expect(out).toContain('og:description" content="Use &lt;b&gt;now&lt;/b&gt;"');
   });
 });
 
