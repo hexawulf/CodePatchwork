@@ -4,11 +4,20 @@ All notable changes to CodePatchwork are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-11-22
 
 ### Added
 - CodePatchwork 2.0 screenshots in `README.md` (`docs/screenshots/`).
-- Tier-S supply-chain hardening: SHA-pinned Node 24 CI workflow, `.github/dependabot.yml`, `SECURITY.md`, `CHANGELOG.md`, and ESLint flat config.
+- Tier-S CI & supply-chain hardening: SHA-pinned Node 24 GitHub Actions, least-privilege permissions, concurrency control, `.github/dependabot.yml`, `SECURITY.md`, `CHANGELOG.md`, and ESLint 9 flat config (`npm run lint`).
+- Real PostgreSQL integration test suite (`npm run test:int`) against live schema + v2 indexes, and Playwright Chromium E2E smoke suite (`npm run test:e2e`, `npm run test:e2e:live`) running in CI.
+- App-level IP rate limiting (`server/middleware/rateLimit.ts`) via `express-rate-limit` for API reads, writes, and auth token exchange.
+
+### Changed
+- Replaced monolithic `firebase` client package with modular `@firebase/app` + `@firebase/auth`, upgraded `firebase-admin` to v14 modular API, `zod` to v4, `drizzle-zod` to `^0.8.3`, and `express` to `^4.22.3` — eliminating all 17 `npm audit` findings (`0` prod / `0` total).
+- Migrated legacy database utility scripts under `scripts/` off `@neondatabase/serverless` and `ws` to `pg`, and removed both unused dependencies.
+
+### Fixed
+- Command Palette now reliably closes on `Escape` immediately from the search input.
 
 ## [2.0.1] - 2026-11-22
 

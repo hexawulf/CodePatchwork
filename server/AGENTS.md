@@ -237,7 +237,7 @@ console.log(snippet.userid, snippet.createdat); // TypeScript error!
 - **Entry Point**: `server/index.ts` - Express app initialization, WebSocket setup, Vite integration
 - **API Routes**: `server/routes.ts` - ALL API endpoints (auth, snippets, collections, comments)
 - **Storage Layer**: `server/storage.ts` - Database operations (implements IStorage interface)
-- **Database Connection**: `server/db.ts` - PostgreSQL pool using `@neondatabase/serverless`
+- **Database Connection**: `server/db.ts` - PostgreSQL pool using `pg` and `drizzle-orm/node-postgres`
 - **Logger**: `server/logger.ts` - Winston configuration (logs to `~/logs/codepatchwork.log`)
 - **Auth Middleware**: `server/routes.ts:authMiddleware` - Firebase token verification
 

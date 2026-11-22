@@ -8,6 +8,7 @@ import express, { Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
+import { apiLimiter, authLimiter, writeLimiter } from "./middleware/rateLimit";
 import logger from "./logger";
 
 if (process.env.NODE_ENV === "production") {
@@ -39,6 +40,7 @@ if (credentialsEnv) {
 
 /* ── 2. Express setup ─────────────────────────────────────────── */
 const app = express();
+app.set("trust proxy", 1);
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
@@ -85,11 +87,14 @@ app.use(
   }),
 );
 
-/* ── 4. Ensure API responses are always JSON ──────────────────── */
+/* ── 4. Ensure API responses are always JSON + rate limiting ──── */
 app.use("/api", (_req, res, next) => {
   res.setHeader("Content-Type", "application/json");
   next();
 });
+app.use("/api", apiLimiter);
+app.use("/api/auth", authLimiter);
+app.use("/api", writeLimiter);
 
 /* ── 5. Request logging ───────────────────────────────────────── */
 app.use((req, res, next) => {

@@ -1,7 +1,7 @@
 # CodePatchwork
 
 [![Live](https://img.shields.io/badge/Live-codepatchwork.com-0d9488?style=flat-square)](https://codepatchwork.com)
-[![Version](https://img.shields.io/badge/version-2.0.1-0d9488?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-2.1.0-0d9488?style=flat-square)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](package.json)
 [![CI](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml/badge.svg)](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml)
 
@@ -146,7 +146,11 @@ A fast, keyboard-first visual code snippet library with syntax highlighting, mul
 |---|---|
 | `npm run dev` | Run Express + Vite dev middleware on `PORT` (default `3001`) |
 | `npm run check` | TypeScript strict type-check (`tsc`) |
+| `npm run lint` | Run ESLint 9 flat config across client, server, shared, and E2E |
 | `npm test` | Run Vitest unit and route test suites (`server/` + `client/src/`) |
+| `npm run test:int` | Run real PostgreSQL `DatabaseStorage` integration tests (`TEST_DATABASE_URL`) |
+| `npm run test:e2e` | Run Playwright Chromium E2E smoke suite (`CODEPATCHWORK_BASE_URL`) |
+| `npm run test:e2e:live` | Run read-only Playwright E2E smoke suite against `https://codepatchwork.com` |
 | `npm run test:watch` | Run Vitest in watch mode |
 | `npm run build` | Build client (`dist/public/`) with split vendor chunks and bundle server (`dist/index.js`) |
 | `npm start` | Run the production bundle (`dist/index.js`) |

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { Pool } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import * as schema from '../shared/schema.js';
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "../shared/schema.js";
+
+const { Pool } = pg;
 
 // Initialize database connection
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
