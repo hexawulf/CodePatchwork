@@ -1,7 +1,7 @@
 # CodePatchwork
 
 [![Live](https://img.shields.io/badge/Live-codepatchwork.com-0d9488?style=flat-square)](https://codepatchwork.com)
-[![Version](https://img.shields.io/badge/version-2.0.0-0d9488?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-2.0.1-0d9488?style=flat-square)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](package.json)
 [![CI](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml/badge.svg)](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml)
 
@@ -9,7 +9,32 @@ A fast, keyboard-first visual code snippet library with syntax highlighting, mul
 
 **Live instance:** [https://codepatchwork.com](https://codepatchwork.com)
 
-![CodePatchwork Banner](codepatchwork-banner.png)
+![CodePatchwork 2.0 Library (Dark Mode)](docs/screenshots/library-dark.png)
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%">
+      <strong>Snippet Inspector Drawer</strong><br/>
+      <img src="docs/screenshots/snippet-drawer.png" alt="Snippet Inspector Drawer with line numbers and actions" />
+    </td>
+    <td width="50%">
+      <strong>Command Palette (<code>⌘K</code> / <code>Ctrl+K</code>)</strong><br/>
+      <img src="docs/screenshots/command-palette.png" alt="Keyboard Command Palette" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>Light Mode</strong><br/>
+      <img src="docs/screenshots/library-light.png" alt="CodePatchwork 2.0 Library in Light Mode" />
+    </td>
+    <td width="50%">
+      <strong>Dark Mode</strong><br/>
+      <img src="docs/screenshots/library-dark.png" alt="CodePatchwork 2.0 Library in Dark Mode" />
+    </td>
+  </tr>
+</table>
 
 ## Features (v2.0)
 
