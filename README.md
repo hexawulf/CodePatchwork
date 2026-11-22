@@ -1,33 +1,34 @@
 # CodePatchwork
 
-[![Live](https://img.shields.io/badge/Live-codepatchwork.com-2563eb?style=flat-square)](https://codepatchwork.com)
+[![Live](https://img.shields.io/badge/Live-codepatchwork.com-0d9488?style=flat-square)](https://codepatchwork.com)
+[![Version](https://img.shields.io/badge/version-2.0.0-0d9488?style=flat-square)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](package.json)
 [![CI](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml/badge.svg)](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml)
 
-A full-stack visual code snippet manager with syntax highlighting, multi-filter search, collections, JSON import/export, and public sharing links.
+A fast, keyboard-first visual code snippet library with syntax highlighting, multi-facet filtering, an inline Snippet Inspector Drawer, collections, drag-and-drop JSON import/export, and public sharing links.
 
 **Live instance:** [https://codepatchwork.com](https://codepatchwork.com)
 
 ![CodePatchwork Banner](codepatchwork-banner.png)
 
-## Features
+## Features (v2.0)
 
-- **Snippet Library & Views** — Organize snippets in grid or list layouts with sorting (recent, oldest, most used, A–Z / Z–A) and favorite toggling.
-- **Syntax Highlighting** — Powered by `prism-react-renderer` with 25 editor languages and 5 switchable syntax themes (Night Owl, Dracula, GitHub, VS Dark, VS Light).
-- **Search & Filtering** — Full-text search across titles and code plus multi-select language, tag, and favorites filtering backed by PostgreSQL queries.
-- **Collections** — Group owned and public snippets into named collections.
-- **Public Sharing & Comments** — Toggle snippet visibility between private and public, generate random URL-safe share links (`/shared/:shareId`), and post comments on accessible snippets.
-- **JSON Import & Export** — Bulk-import snippets from JSON and export your library as a portable JSON file.
-- **Authentication & Isolation** — Google Sign-In via Firebase Authentication with server-side Firebase Admin ID token verification, strict per-user ownership checks, Helmet CSP headers, and PostgreSQL persistence via Drizzle ORM.
-- **Light / Dark / System Theme** — Persistent UI appearance preference alongside global code theme selection.
+- **Unified Library Workspace** — Single-screen library at `/` with live language & tag facet counts (`GET /api/meta`), visibility filters (All / Public / Private), Favorites view, sorting, and instant Grid / List layout switching.
+- **Snippet Inspector Drawer** — Click any snippet card to read full syntax-highlighted code with line-number and word-wrap toggles, Copy Code, Copy as Markdown fence, Download as File (auto-extension by language), Duplicate, inline Collection membership toggles, and inline Comments.
+- **Keyboard-First Command Palette (`⌘K` / `Ctrl+K`)** — Jump directly to any snippet, collection, action, or syntax theme from the keyboard. Single-key shortcuts: `/` (search), `N` (new snippet), `G` / `L` (grid / list view), `Esc` (close drawer/modals).
+- **Upgraded Snippet Editor** — Tab-key indentation respecting your configured tab width, live Write / Preview toggle, interactive tag chip input with autocomplete suggestions, and inline Public/Private visibility toggle.
+- **Persisted Code & UI Preferences** — Light / Dark / System theme, 5 Prism syntax themes (Night Owl, Dracula, GitHub, VS Dark, VS Light), monospace font selector, tab width (2/4/8), line numbers, word wrap, and default layout — all saved automatically and applied live.
+- **Collections & Drag-and-Drop Import/Export** — Collections with live snippet counts, one-click add/remove from collections, per-collection JSON export, and drag-and-drop JSON file import with pre-import validation preview.
+- **Public Sharing & Raw Endpoint** — Public share pages (`/shared/:shareId`) with server-side OpenGraph `<meta>` injection for clean link unfurling plus plain-text raw endpoints (`GET /api/shared/:shareId/raw`) for `curl` / scripting.
+- **Fast & Hardened** — Optimistic mutations (instant favorite, publish, and delete feedback), PostgreSQL secondary + GIN indexes, split immutable vendor chunks, strict Firebase Admin ID token verification, ownership checks, and Helmet CSP headers.
 
 ## Tech Stack
 
 | Layer | Stack |
 |---|---|
-| Frontend | React 18, TypeScript, Vite 6, Tailwind CSS 3, Radix UI, Wouter, TanStack Query 5, `prism-react-renderer` |
+| Frontend | React 18, TypeScript, Vite 6 (vendor chunk splitting), Tailwind CSS 3, Radix UI, Wouter, TanStack Query 5, `prism-react-renderer` |
 | Backend | Node.js (ESM), Express 4, Helmet, Winston, Zod |
-| Database | PostgreSQL, Drizzle ORM, `drizzle-zod`, `pg` |
+| Database | PostgreSQL (B-tree + GIN indexes), Drizzle ORM, `drizzle-zod`, `pg` |
 | Auth | Firebase Authentication (client) + Firebase Admin SDK (server token verification) |
 | Testing | Vitest 4, Supertest |
 
@@ -37,24 +38,26 @@ A full-stack visual code snippet manager with syntax highlighting, multi-filter 
 ├── client/
 │   ├── index.html
 │   └── src/
-│       ├── components/        # Header, Sidebar, SnippetCard, dialogs, Radix UI primitives
-│       ├── contexts/          # Auth, Theme, CodeTheme, Snippet, Collection providers
+│       ├── components/        # Layout, Header, Sidebar, SnippetCard, SnippetDrawer, CommandPalette, AddSnippetDialog, ImportExportDialog, Radix UI primitives
+│       ├── contexts/          # Auth, Theme, Preferences, Snippet (optimistic cache), Collection
 │       ├── hooks/             # useSnippets, use-copy-to-clipboard, use-toast
 │       ├── lib/               # queryClient, firebase, constants, snippets, utils + __tests__/
-│       └── pages/             # Home, PublicHome, Snippets, Collections, CollectionDetail, Tags, Settings, SharedSnippet
+│       └── pages/             # Home (Library), PublicHome, Collections, CollectionDetail, Tags, Settings, SharedSnippet
 ├── public/                    # Favicons and static web assets
+├── scripts/
+│   └── add-v2-indexes.sql     # Idempotent PostgreSQL index migration
 ├── server/
 │   ├── index.ts               # Express bootstrap, Firebase Admin init, Helmet CSP, graceful shutdown
 │   ├── db.ts                  # PostgreSQL Pool + Drizzle instance
 │   ├── logger.ts              # Winston console + file logger (LOG_DIR configurable)
-│   ├── storage.ts             # DatabaseStorage (transactional deletes, escaped ILIKE, array filters)
-│   ├── vite.ts                # Dev Vite middleware & prod static serving
+│   ├── storage.ts             # DatabaseStorage (transactional deletes, /api/meta aggregation, array/search filters)
+│   ├── vite.ts                # Dev Vite middleware, immutable asset caching, OG meta injection on /shared/:shareId
 │   ├── middleware/auth.ts     # Firebase bearer token verification (required + optional)
 │   ├── routes.ts              # Param validation, health/test endpoints, route registration
 │   ├── routes/                # auth.ts, snippets.ts, collections.ts, comments.ts, helpers.ts
-│   └── __tests__/             # Route and storage test suites
+│   └── __tests__/             # Route, OG meta, and storage test suites
 └── shared/
-    └── schema.ts              # Drizzle PostgreSQL schema + shared TypeScript types
+    └── schema.ts              # Drizzle PostgreSQL schema, index definitions, and shared types
 ```
 
 ## API Overview
@@ -63,8 +66,9 @@ A full-stack visual code snippet manager with syntax highlighting, multi-filter 
 |---|---|
 | Health | `GET /api/health`, `GET /api/test` |
 | Auth | `POST /api/auth/user`, `GET /api/auth/me` |
-| Snippets | `GET/POST /api/snippets`, `GET/PUT/DELETE /api/snippets/:id`, `POST /api/snippets/:id/favorite`, `POST /api/snippets/:id/share`, `POST /api/snippets/:id/publish`, `GET /api/snippets/export`, `POST /api/snippets/import` |
-| Public & Metadata | `GET /api/public/snippets`, `GET /api/public/snippets/:id`, `GET /api/shared/:shareId`, `GET /api/languages`, `GET /api/tags` |
+| Library & Meta | `GET /api/meta`, `GET /api/languages`, `GET /api/tags` |
+| Snippets | `GET/POST /api/snippets` (`search`, `language`, `tag`, `favorites`, `visibility`, `limit`, `offset`), `GET/PUT/DELETE /api/snippets/:id`, `GET /api/snippets/:id/collections`, `POST /api/snippets/:id/favorite`, `POST /api/snippets/:id/share`, `POST /api/snippets/:id/publish`, `GET /api/snippets/export`, `POST /api/snippets/import` |
+| Public & Raw | `GET /api/public/snippets`, `GET /api/public/snippets/:id`, `GET /api/shared/:shareId`, `GET /api/shared/:shareId/raw` |
 | Collections | `GET/POST /api/collections`, `GET/PUT/DELETE /api/collections/:id`, `GET /api/collections/:id/snippets`, `POST/DELETE /api/collections/:collectionId/snippets/:snippetId` |
 | Comments | `GET/POST /api/snippets/:snippetId/comments`, `PUT/DELETE /api/comments/:id` |
 
@@ -100,9 +104,10 @@ A full-stack visual code snippet manager with syntax highlighting, multi-filter 
    VITE_FIREBASE_APP_ID=...
    ```
 
-3. Push the Drizzle schema to PostgreSQL:
+3. Push schema and apply performance indexes:
    ```bash
    npm run db:push
+   psql "$DATABASE_URL" -f scripts/add-v2-indexes.sql
    ```
 
 4. Start the development server:
@@ -118,19 +123,18 @@ A full-stack visual code snippet manager with syntax highlighting, multi-filter 
 | `npm run check` | TypeScript strict type-check (`tsc`) |
 | `npm test` | Run Vitest unit and route test suites (`server/` + `client/src/`) |
 | `npm run test:watch` | Run Vitest in watch mode |
-| `npm run build` | Build client (`dist/public/`) with Vite and bundle server (`dist/index.js`) with esbuild |
+| `npm run build` | Build client (`dist/public/`) with split vendor chunks and bundle server (`dist/index.js`) |
 | `npm start` | Run the production bundle (`dist/index.js`) |
 | `npm run db:push` | Push `shared/schema.ts` to PostgreSQL via `drizzle-kit` |
 
 ## Production Deployment
-
-Production builds output a single bundled Express entrypoint (`dist/index.js`) serving the compiled static SPA from `dist/public/`. PM2 configuration is provided in `ecosystem.config.cjs`:
 
 ```bash
 npm ci
 npm run check
 npm test
 npm run build
+psql "$DATABASE_URL" -f scripts/add-v2-indexes.sql
 pm2 reload codepatchwork --update-env
 ```
 
