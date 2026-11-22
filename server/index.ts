@@ -16,22 +16,26 @@ if (process.env.NODE_ENV === "production") {
 
 /* ── 1. Firebase Admin setup ──────────────────────────────────── */
 const credentialsEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-if (!credentialsEnv) {
+if (credentialsEnv) {
+  const svcPath = path.resolve(process.cwd(), credentialsEnv);
+  if (!fs.existsSync(svcPath)) {
+    logger.error(`Service account JSON not found at ${svcPath}. Aborting.`);
+    process.exit(1);
+  }
+  const serviceAccount = JSON.parse(fs.readFileSync(svcPath, { encoding: "utf-8" }));
+  initializeApp({
+    credential: cert(serviceAccount),
+  });
+} else if (process.env.NODE_ENV === "test") {
+  // Test/E2E harness without service account credentials: public routes work,
+  // while authenticated routes still fail closed (401).
+  initializeApp({
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || "codepatchwork-test",
+  });
+} else {
   logger.error("GOOGLE_APPLICATION_CREDENTIALS is not set. Aborting.");
   process.exit(1);
 }
-
-const svcPath = path.resolve(process.cwd(), credentialsEnv);
-if (!fs.existsSync(svcPath)) {
-  logger.error(`Service account JSON not found at ${svcPath}. Aborting.`);
-  process.exit(1);
-}
-
-const serviceAccount = JSON.parse(fs.readFileSync(svcPath, { encoding: "utf-8" }));
-
-initializeApp({
-  credential: cert(serviceAccount),
-});
 
 /* ── 2. Express setup ─────────────────────────────────────────── */
 const app = express();

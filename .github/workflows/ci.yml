@@ -15,8 +15,23 @@ concurrency:
 
 jobs:
   build:
-    name: Typecheck, Test & Build
+    name: Lint, Typecheck, Unit & Integration Tests
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cp_test
+          POSTGRES_PASSWORD: cp_test_password
+          POSTGRES_DB: codepatchwork_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U cp_test -d codepatchwork_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - name: Checkout repository
@@ -39,8 +54,109 @@ jobs:
       - name: Type check
         run: npm run check
 
-      - name: Test
+      - name: Unit & route tests
         run: npm test
 
-      - name: Build
+      - name: Push schema and indexes to PostgreSQL
+        env:
+          DATABASE_URL: postgresql://cp_test:cp_test_password@127.0.0.1:5432/codepatchwork_test
+        run: |
+          npx drizzle-kit push --force
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/add-v2-indexes.sql
+
+      - name: PostgreSQL integration tests
+        env:
+          TEST_DATABASE_URL: postgresql://cp_test:cp_test_password@127.0.0.1:5432/codepatchwork_test
+        run: npm run test:int
+
+      - name: Production build
+        env:
+          VITE_FIREBASE_API_KEY: ci-demo-key
+          VITE_FIREBASE_AUTH_DOMAIN: ci-demo.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: codepatchwork-ci
         run: npm run build
+
+  e2e:
+    name: E2E Smoke Tests (Playwright Chromium)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cp_test
+          POSTGRES_PASSWORD: cp_test_password
+          POSTGRES_DB: codepatchwork_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U cp_test -d codepatchwork_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        env:
+          VITE_FIREBASE_API_KEY: ci-demo-key
+          VITE_FIREBASE_AUTH_DOMAIN: ci-demo.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: codepatchwork-ci
+        run: npm run build
+
+      - name: Prepare and seed PostgreSQL
+        env:
+          DATABASE_URL: postgresql://cp_test:cp_test_password@127.0.0.1:5432/codepatchwork_test
+        run: |
+          npx drizzle-kit push --force
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/add-v2-indexes.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+            INSERT INTO users (id, email, display_name) VALUES ('ci-user', 'ci@example.test', 'CI User') ON CONFLICT DO NOTHING;
+            INSERT INTO snippets (title, description, code, language, tags, userid, ispublic, shareid)
+            VALUES (
+              'CI Python Smoke Snippet',
+              'Seeded public snippet for Playwright E2E smoke test',
+              'def greet(name: str) -> str:\n    return f\"Hello, {name}!\"',
+              'python',
+              ARRAY['python', 'ci', 'smoke'],
+              'ci-user',
+              true,
+              'ci-smoke-001'
+            );
+          "
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start server and run Playwright E2E
+        env:
+          NODE_ENV: test
+          PORT: "3099"
+          DATABASE_URL: postgresql://cp_test:cp_test_password@127.0.0.1:5432/codepatchwork_test
+          LOG_DIR: /tmp/codepatchwork-e2e-logs
+          CODEPATCHWORK_BASE_URL: http://127.0.0.1:3099
+        run: |
+          node dist/index.js &
+          APP_PID=$!
+          trap 'kill "${APP_PID}" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3099/api/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3099/api/health
+          npm run test:e2e

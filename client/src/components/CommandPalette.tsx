@@ -226,6 +226,9 @@ export default function CommandPalette() {
     } else if (e.key === "Enter" && filtered[activeIndex]) {
       e.preventDefault();
       filtered[activeIndex].onSelect();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setCommandOpen(false);
     }
   };
 
