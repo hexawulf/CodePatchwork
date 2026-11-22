@@ -1,8 +1,10 @@
-import { type Snippet } from "@shared/schema";
+import type { Snippet } from "@shared/schema";
 import SnippetCard from "./SnippetCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Code2, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useSnippetContext } from "@/contexts/SnippetContext";
 
 interface SnippetGridProps {
   snippets: Snippet[];
@@ -10,37 +12,49 @@ interface SnippetGridProps {
   error: Error | null;
   viewMode: "grid" | "list";
   isPublicView?: boolean;
+  onRemoveFromCollection?: (snippetId: number) => void;
 }
 
-export default function SnippetGrid({ snippets, isLoading, error, viewMode, isPublicView = false }: SnippetGridProps) {
+export default function SnippetGrid({
+  snippets,
+  isLoading,
+  error,
+  viewMode,
+  isPublicView = false,
+  onRemoveFromCollection,
+}: SnippetGridProps) {
+  const { openCreateEditor } = useSnippetContext();
+
   if (error) {
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>Error</AlertTitle>
-        <AlertDescription>
-          Failed to load snippets: {error.message}
-        </AlertDescription>
+        <AlertDescription>Failed to load snippets: {error.message}</AlertDescription>
       </Alert>
     );
   }
 
+  const gridClass =
+    viewMode === "list"
+      ? "grid grid-cols-1 gap-3.5"
+      : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4";
+
   if (isLoading) {
     return (
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${viewMode === "list" ? "!grid-cols-1" : ""}`}>
+      <div className={gridClass}>
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shadow-sm p-4">
-            <div className="flex justify-between items-start mb-4">
-              <Skeleton className="h-6 w-36" />
-              <Skeleton className="h-6 w-16" />
+          <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-5 w-16" />
             </div>
-            <Skeleton className="h-4 w-full mb-2" />
-            <Skeleton className="h-4 w-3/4 mb-4" />
-            <div className="flex gap-2 mb-4">
-              <Skeleton className="h-5 w-16 rounded-full" />
-              <Skeleton className="h-5 w-20 rounded-full" />
+            <Skeleton className="mb-3 h-3.5 w-3/4" />
+            <div className="mb-3 flex gap-1.5">
+              <Skeleton className="h-5 w-16 rounded-md" />
+              <Skeleton className="h-5 w-14 rounded-md" />
             </div>
-            <Skeleton className="h-24 w-full rounded-md" />
+            <Skeleton className="h-32 w-full rounded-lg" />
           </div>
         ))}
       </div>
@@ -49,23 +63,38 @@ export default function SnippetGrid({ snippets, isLoading, error, viewMode, isPu
 
   if (snippets.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg p-8 text-center">
-        <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-          {isPublicView ? "No Public Snippets Found" : "No Snippets Found"}
+      <div className="rounded-xl border border-dashed border-border bg-card/60 p-12 text-center">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Code2 className="h-6 w-6" />
+        </div>
+        <h3 className="text-base font-semibold text-foreground mb-1">
+          {isPublicView ? "No public snippets found" : "No matching snippets"}
         </h3>
-        <p className="text-slate-500 dark:text-slate-400">
-          {isPublicView 
-            ? "Try adjusting your search or filters, or check back later!" 
-            : "Try adjusting your search or filters, or create a new snippet."}
+        <p className="mx-auto max-w-sm text-sm text-muted-foreground mb-5">
+          {isPublicView
+            ? "Try adjusting your search or language filter."
+            : "Clear your active filters or save your first reusable code snippet."}
         </p>
+        {!isPublicView && (
+          <Button size="sm" onClick={openCreateEditor} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            New Snippet
+          </Button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${viewMode === "list" ? "!grid-cols-1" : ""}`}>
+    <div className={gridClass}>
       {snippets.map((snippet) => (
-        <SnippetCard key={snippet.id} snippet={snippet} viewMode={viewMode} isPublicView={isPublicView} />
+        <SnippetCard
+          key={snippet.id}
+          snippet={snippet}
+          viewMode={viewMode}
+          isPublicView={isPublicView}
+          onRemoveFromCollection={onRemoveFromCollection}
+        />
       ))}
     </div>
   );

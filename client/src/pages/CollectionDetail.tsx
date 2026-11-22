@@ -3,23 +3,23 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { useCollectionContext } from "@/contexts/CollectionContext";
+import { useToast } from "@/hooks/use-toast";
 import SnippetGrid from "@/components/SnippetGrid";
 import type { Collection, Snippet } from "@shared/schema";
 
 export default function CollectionDetail() {
   const [, params] = useRoute<{ id: string }>("/collections/:id");
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const parsedId = params ? Number.parseInt(params.id, 10) : Number.NaN;
   const collectionId = Number.isInteger(parsedId) && parsedId > 0 ? parsedId : null;
 
-  const { setActiveCollectionId } = useCollectionContext();
+  const { setActiveCollectionId, removeSnippetFromCollection } = useCollectionContext();
 
   useEffect(() => {
-    if (collectionId !== null) {
-      setActiveCollectionId(collectionId);
-    }
+    if (collectionId !== null) setActiveCollectionId(collectionId);
     return () => setActiveCollectionId(null);
   }, [collectionId, setActiveCollectionId]);
 
@@ -43,31 +43,44 @@ export default function CollectionDetail() {
     retry: 1,
   });
 
+  const handleExportCollection = () => {
+    if (!collection || snippets.length === 0) return;
+    const payload = snippets.map((s) => ({
+      title: s.title,
+      description: s.description,
+      code: s.code,
+      language: s.language,
+      tags: s.tags ?? [],
+      isFavorite: s.isFavorite === true,
+      isPublic: s.isPublic === true,
+    }));
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const slug = collection.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "collection";
+    link.download = `codepatchwork-${slug}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    toast({
+      title: "Collection exported",
+      description: `${snippets.length} snippets saved as JSON.`,
+    });
+  };
+
   if (isLoadingCollection || isLoadingSnippets) {
     return (
       <Layout>
-        <div className="flex items-center space-x-2 mb-6">
+        <div className="mb-6 flex items-center gap-3">
           <Button variant="ghost" size="sm" className="gap-1" onClick={() => navigate("/collections")}>
             <ArrowLeft className="h-4 w-4" />
-            Back
+            Collections
           </Button>
-          <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-full w-40 animate-pulse" />
+          <div className="h-6 w-40 animate-pulse rounded bg-muted" />
         </div>
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4"
-              >
-                <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mb-2" />
-                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mb-4" />
-                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-2" />
-              </div>
-            ))}
-          </div>
-        </div>
+        <SnippetGrid snippets={[]} isLoading={true} error={null} viewMode="grid" />
       </Layout>
     );
   }
@@ -75,16 +88,12 @@ export default function CollectionDetail() {
   if (collectionError || snippetsError) {
     return (
       <Layout>
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <h2 className="text-lg font-medium text-red-800 dark:text-red-400">
-            Error loading collection
-          </h2>
-          <p className="text-red-700 dark:text-red-300 mt-1">
-            {collectionError?.message || snippetsError?.message}
-          </p>
-          <Button variant="outline" className="mt-4" onClick={() => navigate("/collections")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Go Back
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-5 text-destructive">
+          <h2 className="font-semibold">Error loading collection</h2>
+          <p className="mt-1 text-sm">{collectionError?.message || snippetsError?.message}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/collections")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Collections
           </Button>
         </div>
       </Layout>
@@ -93,41 +102,60 @@ export default function CollectionDetail() {
 
   return (
     <Layout>
-      <div className="flex flex-col space-y-4 mb-6">
-        <div className="flex items-center">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1 mr-4"
+            className="-ml-2 mb-1 gap-1 text-muted-foreground hover:text-foreground"
             onClick={() => navigate("/collections")}
           >
             <ArrowLeft className="h-4 w-4" />
-            Back
+            Collections
           </Button>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {collection?.name || "Collection"}
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              {collection?.name || "Collection"}
+            </h1>
+            <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+              {snippets.length}
+            </span>
+          </div>
+          {collection?.description && (
+            <p className="mt-1 text-sm text-muted-foreground">{collection.description}</p>
+          )}
         </div>
 
-        {collection?.description && (
-          <p className="text-slate-500 dark:text-slate-400">{collection.description}</p>
+        {snippets.length > 0 && (
+          <Button variant="outline" size="sm" onClick={handleExportCollection} className="gap-1.5 self-start sm:self-auto">
+            <Download className="h-4 w-4" />
+            Export JSON
+          </Button>
         )}
       </div>
 
       {snippets.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg p-8 text-center">
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-            No snippets in this collection
-          </h3>
-          <p className="text-slate-500 dark:text-slate-400 mb-4">
-            Add snippets to this collection from the snippets page
+        <div className="rounded-xl border border-dashed border-border bg-card/60 p-10 text-center">
+          <h3 className="mb-1 text-base font-semibold text-foreground">No snippets in this collection</h3>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Open any snippet from your library and toggle this collection in the inspector drawer.
           </p>
-          <Button variant="outline" onClick={() => navigate("/snippets")}>
-            Go to Snippets
+          <Button variant="outline" size="sm" onClick={() => navigate("/")}>
+            Browse Library
           </Button>
         </div>
       ) : (
-        <SnippetGrid snippets={snippets} isLoading={false} error={null} viewMode="grid" />
+        <SnippetGrid
+          snippets={snippets}
+          isLoading={false}
+          error={null}
+          viewMode="grid"
+          onRemoveFromCollection={
+            collectionId !== null
+              ? (snippetId) => removeSnippetFromCollection(collectionId, snippetId)
+              : undefined
+          }
+        />
       )}
     </Layout>
   );

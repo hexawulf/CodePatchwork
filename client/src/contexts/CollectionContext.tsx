@@ -23,12 +23,24 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const invalidateCollections = (collectionId?: number, snippetId?: number) => {
+    queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/meta"] });
+    if (collectionId !== undefined) {
+      queryClient.invalidateQueries({ queryKey: ["/api/collections", collectionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/collections", collectionId, "snippets"] });
+    }
+    if (snippetId !== undefined) {
+      queryClient.invalidateQueries({ queryKey: ["/api/snippets", snippetId, "collections"] });
+    }
+  };
+
   const createCollectionMutation = useMutation({
     mutationFn: async (collection: CollectionInput) => {
       await apiRequest("POST", "/api/collections", collection);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
+      invalidateCollections();
       toast({
         title: "Collection created",
         description: "Your collection has been created successfully.",
@@ -48,8 +60,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
       await apiRequest("PUT", `/api/collections/${id}`, collection);
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/collections", variables.id] });
+      invalidateCollections(variables.id);
       toast({
         title: "Collection updated",
         description: "Your collection has been updated successfully.",
@@ -68,9 +79,9 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/collections/${id}`, undefined, { expectJson: false });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
-      if (activeCollectionId !== null) {
+    onSuccess: (_data, id) => {
+      invalidateCollections(id);
+      if (activeCollectionId === id) {
         setActiveCollectionId(null);
       }
       toast({
@@ -92,11 +103,9 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", `/api/collections/${collectionId}/snippets/${snippetId}`, {});
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/collections", variables.collectionId, "snippets"],
-      });
+      invalidateCollections(variables.collectionId, variables.snippetId);
       toast({
-        title: "Snippet added",
+        title: "Added to collection",
         description: "The snippet has been added to the collection.",
       });
     },
@@ -116,11 +125,9 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
       });
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/collections", variables.collectionId, "snippets"],
-      });
+      invalidateCollections(variables.collectionId, variables.snippetId);
       toast({
-        title: "Snippet removed",
+        title: "Removed from collection",
         description: "The snippet has been removed from the collection.",
       });
     },

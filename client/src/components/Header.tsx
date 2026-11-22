@@ -1,210 +1,217 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Menu, Plus, Sun, Moon, Upload, Download, Info, User } from "lucide-react";
+import { useSnippetContext } from "@/contexts/SnippetContext";
+import { Menu, Plus, Search, Sun, Moon, User, Settings, Upload, Info, LogOut, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import SearchBar from "./SearchBar";
-import AddSnippetDialog from "./AddSnippetDialog";
-import ImportExportDialog from "./ImportExportDialog";
-import GlobalCodeThemeSelector from "./GlobalCodeThemeSelector";
-import AboutModal from "./AboutModal";
-import { downloadSnippetsExport } from "@/lib/exportSnippets";
-import { useToast } from "@/hooks/use-toast";
 
 interface HeaderProps {
   toggleMobileMenu?: () => void;
+  isPublicView?: boolean;
+  searchInputRef?: React.RefObject<HTMLInputElement>;
 }
 
-const Header = ({ toggleMobileMenu }: HeaderProps = {}) => {
+export default function Header({
+  toggleMobileMenu,
+  isPublicView = false,
+  searchInputRef,
+}: HeaderProps) {
   const { user, isAuthenticated, signIn, signOut } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
-  const { toast } = useToast();
+  const {
+    searchTerm,
+    setSearchTerm,
+    openCreateEditor,
+    setCommandOpen,
+    setImportExportOpen,
+    setAboutOpen,
+  } = useSnippetContext();
+  const [, navigate] = useLocation();
 
-  const [snippetDialogOpen, setSnippetDialogOpen] = useState(false);
-  const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
-  const [aboutModalOpen, setAboutModalOpen] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const userDropdownRef = useRef<HTMLDivElement>(null);
+  const [inputValue, setInputValue] = useState(searchTerm);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
-        setUserDropdownOpen(false);
-      }
+    setInputValue(searchTerm);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleExport = async () => {
-    try {
-      const count = await downloadSnippetsExport();
-      toast({ title: "Snippets exported", description: `${count} snippets saved to a JSON file.` });
-    } catch (err: unknown) {
-      toast({
-        title: "Export failed",
-        description: err instanceof Error ? err.message : "Could not export snippets.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleLogout = async () => {
-    await signOut();
-    setUserDropdownOpen(false);
+  const handleSearchChange = (value: string) => {
+    setInputValue(value);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setSearchTerm(value), 200);
   };
 
   return (
-    <>
-      <header className="bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-slate-700 py-3 px-4 flex justify-between items-center">
-        <div className="flex items-center md:hidden">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-card/90 px-4 backdrop-blur-md">
+      {/* Left: Mobile menu + Brand */}
+      <div className="flex items-center gap-2 md:hidden">
+        {!isPublicView && (
           <button
             type="button"
             onClick={toggleMobileMenu}
-            className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="Toggle menu"
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5" />
           </button>
-          <span className="ml-2 font-semibold text-slate-800 dark:text-white">CodePatchwork</span>
-        </div>
-
-        <div className="max-w-lg w-full hidden md:block">
-          <SearchBar />
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md"
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {theme === "dark" ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setAboutModalOpen(true)}
-            className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md"
-            aria-label="About CodePatchwork"
-          >
-            <Info className="h-6 w-6" />
-          </button>
-
-          {/* Desktop actions */}
-          <div className="hidden md:flex items-center space-x-2">
-            <GlobalCodeThemeSelector />
-
-            <Button size="sm" onClick={() => setSnippetDialogOpen(true)} className="flex items-center gap-1">
-              <Plus className="h-4 w-4" />
-              <span>New Snippet</span>
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center">
-                  <Download className="h-4 w-4 mr-1" />
-                  Import/Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setImportExportDialogOpen(true)}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import Snippets
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExport}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Snippets
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Mobile actions */}
-          <div className="md:hidden flex items-center space-x-2">
-            <GlobalCodeThemeSelector />
-
-            <Button onClick={() => setSnippetDialogOpen(true)} className="flex items-center" size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Add
-            </Button>
-
-            <Button
-              onClick={() => setImportExportDialogOpen(true)}
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              aria-label="Import or export snippets"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Auth section */}
-          <div className="relative" ref={userDropdownRef}>
-            {isAuthenticated ? (
-              <>
-                <Button
-                  variant="ghost"
-                  className="relative h-10 w-10 rounded-full"
-                  onClick={() => setUserDropdownOpen((v) => !v)}
-                  aria-label="User menu"
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback>
-                      {user?.email ? user.email[0].toUpperCase() : <User className="h-5 w-5" />}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-
-                {userDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg z-50">
-                    <div className="border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
-                      {user?.email}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      Log Out
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <Button size="sm" onClick={signIn} className="flex items-center gap-1">
-                <User className="h-4 w-4 mr-1" />
-                Log In
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <div className="md:hidden p-2 bg-white dark:bg-gray-900 border-b border-slate-200 dark:border-slate-700">
-        <SearchBar />
+        )}
+        <span className="font-semibold tracking-tight text-foreground">CodePatchwork</span>
       </div>
 
-      {snippetDialogOpen && (
-        <AddSnippetDialog open={snippetDialogOpen} onOpenChange={setSnippetDialogOpen} />
+      {/* Center: Single unified search + Command Palette trigger */}
+      {!isPublicView ? (
+        <div className="relative flex-1 max-w-xl">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (timerRef.current) clearTimeout(timerRef.current);
+                setSearchTerm(inputValue);
+              }
+            }}
+            placeholder="Search snippets by title, code, or description..."
+            className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-20 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+            {inputValue && (
+              <button
+                type="button"
+                onClick={() => handleSearchChange("")}
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setCommandOpen(true)}
+              className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              title="Open Command Palette"
+            >
+              ⌘K
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="hidden md:flex items-center gap-2 font-semibold text-foreground">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
+            CP
+          </span>
+          CodePatchwork
+        </div>
       )}
-      {importExportDialogOpen && (
-        <ImportExportDialog open={importExportDialogOpen} onOpenChange={setImportExportDialogOpen} />
-      )}
-      {aboutModalOpen && (
-        <AboutModal open={aboutModalOpen} onOpenChange={setAboutModalOpen} />
-      )}
-    </>
-  );
-};
 
-export default Header;
+      {/* Right: Clean Primary CTA + Account */}
+      <div className="flex items-center gap-2">
+        {isPublicView && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => setAboutOpen(true)}
+              aria-label="About CodePatchwork"
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+
+        {isAuthenticated && !isPublicView && (
+          <Button size="sm" onClick={openCreateEditor} className="h-9 gap-1.5 font-medium">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">New Snippet</span>
+          </Button>
+        )}
+
+        {isAuthenticated ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-9 w-9 rounded-full p-0" aria-label="Account menu">
+                <Avatar className="h-8 w-8 border border-border">
+                  <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+                    {user?.email ? user.email[0].toUpperCase() : <User className="h-4 w-4" />}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-0.5">
+                  <p className="text-sm font-medium leading-none">
+                    {user?.displayName || "Account"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setImportExportOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import / Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleTheme}>
+                {theme === "dark" ? (
+                  <Sun className="mr-2 h-4 w-4" />
+                ) : (
+                  <Moon className="mr-2 h-4 w-4" />
+                )}
+                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAboutOpen(true)}>
+                <Info className="mr-2 h-4 w-4" />
+                About CodePatchwork
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => signOut()}
+                className="text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Log Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button size="sm" onClick={signIn} className="h-9 gap-1.5">
+            <User className="h-4 w-4" />
+            Sign In
+          </Button>
+        )}
+      </div>
+    </header>
+  );
+}

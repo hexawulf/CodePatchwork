@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
-import type { Collection } from "@shared/schema";
+import type { CollectionWithCount } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Plus, FolderOpen, Pencil, Trash2, MoreVertical } from "lucide-react";
+import { Plus, FolderOpen, Pencil, Trash2, MoreVertical, ArrowRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
   DropdownMenu,
@@ -26,14 +26,14 @@ import CollectionDialog from "@/components/CollectionDialog";
 import { useQuery } from "@tanstack/react-query";
 
 export default function Collections() {
-  const [collectionToDelete, setCollectionToDelete] = useState<Collection | null>(null);
+  const [collectionToDelete, setCollectionToDelete] = useState<CollectionWithCount | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [collectionToEdit, setCollectionToEdit] = useState<Collection | null>(null);
+  const [collectionToEdit, setCollectionToEdit] = useState<CollectionWithCount | null>(null);
   const [, navigate] = useLocation();
 
   const { deleteCollection, setActiveCollectionId } = useCollectionContext();
 
-  const { data: collections = [], isLoading, error } = useQuery<Collection[]>({
+  const { data: collections = [], isLoading, error } = useQuery<CollectionWithCount[]>({
     queryKey: ["/api/collections"],
     retry: 1,
   });
@@ -55,22 +55,19 @@ export default function Collections() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Collections</h1>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Collections</h1>
+          <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
             New Collection
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 animate-pulse"
-            >
-              <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mb-2" />
-              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mb-4" />
-              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/4 mb-2" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+              <div className="mb-3 h-5 w-2/3 rounded bg-muted" />
+              <div className="mb-4 h-4 w-1/2 rounded bg-muted" />
+              <div className="h-3 w-1/4 rounded bg-muted" />
             </div>
           ))}
         </div>
@@ -81,11 +78,9 @@ export default function Collections() {
   if (error) {
     return (
       <Layout>
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <h2 className="text-lg font-medium text-red-800 dark:text-red-400">
-            Error loading collections
-          </h2>
-          <p className="text-red-700 dark:text-red-300 mt-1">{error.message}</p>
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-destructive">
+          <h2 className="font-semibold">Error loading collections</h2>
+          <p className="mt-1 text-sm">{error.message}</p>
         </div>
       </Layout>
     );
@@ -93,63 +88,73 @@ export default function Collections() {
 
   return (
     <Layout>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Collections</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Organize your snippets into collections
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Collections</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Group related snippets into focused sets.
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} className="mt-4 sm:mt-0">
-          <Plus className="h-4 w-4 mr-2" />
+        <Button size="sm" onClick={() => setShowCreateDialog(true)} className="gap-1.5 self-start sm:self-auto">
+          <Plus className="h-4 w-4" />
           New Collection
         </Button>
       </div>
 
       {collections.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg p-8 text-center">
-          <FolderOpen className="h-12 w-12 mx-auto text-slate-400 dark:text-slate-500 mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-            No collections yet
-          </h3>
-          <p className="text-slate-500 dark:text-slate-400 mb-4">
-            Create your first collection to organize your code snippets
+        <div className="rounded-xl border border-dashed border-border bg-card/60 p-12 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <FolderOpen className="h-6 w-6" />
+          </div>
+          <h3 className="mb-1 text-base font-semibold text-foreground">No collections yet</h3>
+          <p className="mb-5 text-sm text-muted-foreground">
+            Create your first collection to group snippets by project or topic.
           </p>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button size="sm" onClick={() => setShowCreateDialog(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" />
             New Collection
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {collections.map((collection) => (
             <div
               key={collection.id}
-              className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow duration-200"
+              className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
             >
-              <div className="p-4">
-                <div className="flex justify-between items-start">
-                  <h3 className="font-medium text-slate-900 dark:text-white">{collection.name}</h3>
+              <div className="flex-1 p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleViewSnippets(collection.id)}
+                    className="flex min-w-0 items-center gap-2 text-left"
+                  >
+                    <FolderOpen className="h-4 w-4 shrink-0 text-primary" />
+                    <h3 className="truncate font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {collection.name}
+                    </h3>
+                  </button>
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                        className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                         aria-label="More options"
                       >
-                        <MoreVertical className="h-5 w-5" />
+                        <MoreVertical className="h-4 w-4" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => setCollectionToEdit(collection)}>
-                        <Pencil className="h-4 w-4 mr-2" />
+                        <Pencil className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setCollectionToDelete(collection)}
-                        className="text-red-600 focus:text-red-600"
+                        className="text-destructive focus:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -157,25 +162,31 @@ export default function Collections() {
                 </div>
 
                 {collection.description && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-3">
+                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                     {collection.description}
                   </p>
                 )}
 
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  Created {formatDistanceToNow(new Date(collection.createdAt), { addSuffix: true })}
+                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                    {collection.snippetCount ?? 0}{" "}
+                    {(collection.snippetCount ?? 0) === 1 ? "snippet" : "snippets"}
+                  </span>
+                  <span>·</span>
+                  <span>
+                    Created {formatDistanceToNow(new Date(collection.createdAt), { addSuffix: true })}
+                  </span>
                 </div>
               </div>
 
-              <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                <Button
-                  variant="link"
-                  className="p-0 h-auto text-sm text-primary-600 dark:text-primary-400 font-normal"
-                  onClick={() => handleViewSnippets(collection.id)}
-                >
-                  View snippets
-                </Button>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleViewSnippets(collection.id)}
+                className="flex items-center justify-between border-t border-border/70 bg-muted/30 px-5 py-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-primary transition-colors"
+              >
+                <span>Open collection</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           ))}
         </div>
@@ -190,17 +201,17 @@ export default function Collections() {
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>Delete collection?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete the collection &ldquo;{collectionToDelete.name}&rdquo;
-                and remove all snippets from it. This action cannot be undone.
+                This will permanently delete &ldquo;{collectionToDelete.name}&rdquo;. Your snippets
+                themselves will not be deleted.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDeleteCollection}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 Delete
               </AlertDialogAction>

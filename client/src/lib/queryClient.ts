@@ -24,7 +24,7 @@ export function buildQueryUrl(queryKey: QueryKey): string {
   return segments.join("/");
 }
 
-/** Invalidate all snippet list/filtered/metadata queries. */
+/** Invalidate all snippet list, filtered, public, and metadata queries. */
 export function invalidateSnippetQueries(qc: QueryClient): Promise<void> {
   return qc.invalidateQueries({
     predicate: (query) => {
@@ -33,8 +33,10 @@ export function invalidateSnippetQueries(qc: QueryClient): Promise<void> {
         typeof first === "string" &&
         (first.startsWith("/api/snippets") ||
           first.startsWith("/api/public/snippets") ||
+          first === "/api/meta" ||
           first === "/api/languages" ||
-          first === "/api/tags")
+          first === "/api/tags" ||
+          first === "/api/collections")
       );
     },
   });
@@ -126,7 +128,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 30_000,
       retry: false,
     },
     mutations: {

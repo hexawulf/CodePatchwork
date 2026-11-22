@@ -1,108 +1,121 @@
-import React from 'react';
-import { X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import type { VisibilityFilter } from "@/hooks/useSnippets";
 
 interface FilterBadgesProps {
+  searchTerm?: string;
   languages: string[] | null;
   tags: string[] | null;
   favoritesOnly: boolean;
+  visibility?: VisibilityFilter;
+  onClearSearch?: () => void;
   onRemoveLanguage: (language: string) => void;
   onRemoveTag: (tag: string) => void;
   onRemoveFavorites: () => void;
+  onClearVisibility?: () => void;
   onClearAll: () => void;
   className?: string;
 }
 
 export default function FilterBadges({
+  searchTerm,
   languages,
   tags,
   favoritesOnly,
+  visibility = "all",
+  onClearSearch,
   onRemoveLanguage,
   onRemoveTag,
   onRemoveFavorites,
+  onClearVisibility,
   onClearAll,
-  className
+  className = "",
 }: FilterBadgesProps) {
-  // Check if any filters are active
-  const hasActiveFilters = 
-    (languages && languages.length > 0) || 
-    (tags && tags.length > 0) || 
-    favoritesOnly;
-  
-  // If no filters are active, don't render the component
+  const hasActiveFilters =
+    Boolean(searchTerm?.trim()) ||
+    Boolean(languages && languages.length > 0) ||
+    Boolean(tags && tags.length > 0) ||
+    favoritesOnly ||
+    visibility !== "all";
+
   if (!hasActiveFilters) return null;
-  
+
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
-      <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mr-1">
-        Active filters:
-      </div>
-      
-      {/* Language badges */}
-      {languages && languages.map(language => (
-        <Badge 
-          key={`lang-${language}`}
-          variant="secondary"
-          className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-        >
-          <span className="capitalize">{language}</span>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-4 w-4 p-0 hover:bg-blue-200 dark:hover:bg-blue-800" 
-            onClick={() => onRemoveLanguage(language)}
-          >
+      <span className="text-xs font-medium text-muted-foreground mr-1">Active filters:</span>
+
+      {searchTerm?.trim() && onClearSearch && (
+        <Badge variant="secondary" className="gap-1 px-2 py-0.5 text-xs">
+          <span>&ldquo;{searchTerm.trim()}&rdquo;</span>
+          <button type="button" onClick={onClearSearch} aria-label="Clear search">
             <X className="h-3 w-3" />
-            <span className="sr-only">Remove {language} filter</span>
-          </Button>
-        </Badge>
-      ))}
-      
-      {/* Tag badges */}
-      {tags && tags.map(tag => (
-        <Badge 
-          key={`tag-${tag}`}
-          variant="secondary"
-          className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-        >
-          <span>#{tag}</span>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-4 w-4 p-0 hover:bg-green-200 dark:hover:bg-green-800" 
-            onClick={() => onRemoveTag(tag)}
-          >
-            <X className="h-3 w-3" />
-            <span className="sr-only">Remove {tag} filter</span>
-          </Button>
-        </Badge>
-      ))}
-      
-      {/* Favorites badge */}
-      {favoritesOnly && (
-        <Badge 
-          variant="secondary"
-          className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-        >
-          <span>Favorites only</span>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-4 w-4 p-0 hover:bg-amber-200 dark:hover:bg-amber-800" 
-            onClick={onRemoveFavorites}
-          >
-            <X className="h-3 w-3" />
-            <span className="sr-only">Remove favorites filter</span>
-          </Button>
+          </button>
         </Badge>
       )}
-      
-      {/* Clear all button */}
-      <Button 
-        variant="ghost" 
-        size="sm" 
-        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 ml-2"
+
+      {languages?.map((language) => (
+        <Badge
+          key={`lang-${language}`}
+          variant="secondary"
+          className="gap-1 bg-primary/15 px-2 py-0.5 text-xs text-primary hover:bg-primary/20"
+        >
+          <span className="capitalize">{language}</span>
+          <button
+            type="button"
+            onClick={() => onRemoveLanguage(language)}
+            aria-label={`Remove ${language} filter`}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ))}
+
+      {tags?.map((tag) => (
+        <Badge
+          key={`tag-${tag}`}
+          variant="secondary"
+          className="gap-1 px-2 py-0.5 text-xs"
+        >
+          <span>#{tag}</span>
+          <button
+            type="button"
+            onClick={() => onRemoveTag(tag)}
+            aria-label={`Remove ${tag} filter`}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ))}
+
+      {visibility !== "all" && onClearVisibility && (
+        <Badge
+          variant="secondary"
+          className="gap-1 bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400"
+        >
+          <span className="capitalize">{visibility} only</span>
+          <button type="button" onClick={onClearVisibility} aria-label="Clear visibility filter">
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      )}
+
+      {favoritesOnly && (
+        <Badge
+          variant="secondary"
+          className="gap-1 bg-amber-500/15 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400"
+        >
+          <span>Favorites</span>
+          <button type="button" onClick={onRemoveFavorites} aria-label="Remove favorites filter">
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      )}
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
         onClick={onClearAll}
       >
         Clear all

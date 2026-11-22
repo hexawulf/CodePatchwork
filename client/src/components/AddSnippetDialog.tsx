@@ -1,12 +1,16 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent, type KeyboardEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, invalidateSnippetQueries } from "@/lib/queryClient";
-import { useQueryClient } from "@tanstack/react-query";
-import type { Snippet } from "@shared/schema";
+import { useSnippetContext } from "@/contexts/SnippetContext";
+import { usePreferences } from "@/contexts/PreferencesContext";
+import type { LibraryMeta, Snippet } from "@shared/schema";
 import { LANGUAGES } from "@/lib/constants";
+import CodeBlock from "./CodeBlock";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +18,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -23,163 +26,174 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Eye, Code2, X, Globe, Lock } from "lucide-react";
 
 interface AddSnippetDialogProps {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   snippetToEdit?: Snippet | null;
   isEditMode?: boolean;
 }
 
 export default function AddSnippetDialog({
-  open: controlledOpen,
+  open,
   onOpenChange,
   snippetToEdit = null,
   isEditMode = false,
-}: AddSnippetDialogProps = {}) {
+}: AddSnippetDialogProps) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [internalOpen, setInternalOpen] = useState(false);
+  const { createSnippet, updateSnippet } = useSnippetContext();
+  const { prefs } = usePreferences();
+
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
-  const [language, setLanguage] = useState("javascript");
-  const [tagsInput, setTagsInput] = useState("");
+  const [language, setLanguage] = useState("typescript");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isControlled = controlledOpen !== undefined;
-  const open = isControlled ? controlledOpen : internalOpen;
-
-  const setOpen = (newOpen: boolean) => {
-    if (isControlled) {
-      onOpenChange?.(newOpen);
-    } else {
-      setInternalOpen(newOpen);
-    }
-  };
+  const { data: meta } = useQuery<LibraryMeta>({
+    queryKey: ["/api/meta"],
+    enabled: open,
+  });
 
   useEffect(() => {
     if (open) {
+      setPreviewMode(false);
+      setTagDraft("");
       if (isEditMode && snippetToEdit) {
         setTitle(snippetToEdit.title);
         setCode(snippetToEdit.code);
         setDescription(snippetToEdit.description || "");
-        setLanguage(snippetToEdit.language);
-        setTagsInput(snippetToEdit.tags?.join(", ") || "");
-      } else if (!isEditMode) {
+        setLanguage(snippetToEdit.language || "typescript");
+        setTags(snippetToEdit.tags ?? []);
+        setIsPublic(snippetToEdit.isPublic === true);
+      } else {
         setTitle("");
         setCode("");
         setDescription("");
-        setLanguage("javascript");
-        setTagsInput("");
+        setLanguage("typescript");
+        setTags([]);
+        setIsPublic(false);
       }
     }
   }, [open, isEditMode, snippetToEdit]);
 
+  const addTag = (raw: string) => {
+    const clean = raw.trim().toLowerCase().replace(/^#/, "");
+    if (!clean || tags.includes(clean)) return;
+    setTags((prev) => [...prev, clean]);
+    setTagDraft("");
+  };
+
+  const removeTag = (target: string) => {
+    setTags((prev) => prev.filter((t) => t !== target));
+  };
+
+  const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagDraft);
+    } else if (e.key === "Backspace" && !tagDraft && tags.length > 0) {
+      setTags((prev) => prev.slice(0, -1));
+    }
+  };
+
+  const handleCodeKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    const target = e.currentTarget;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const indent = " ".repeat(prefs.tabSize);
+    const next = code.slice(0, start) + indent + code.slice(end);
+    setCode(next);
+    requestAnimationFrame(() => {
+      target.selectionStart = target.selectionEnd = start + indent.length;
+    });
+  };
+
+  const suggestedTags = (meta?.tags ?? [])
+    .map((t) => t.name)
+    .filter(
+      (t) =>
+        !tags.includes(t) &&
+        (!tagDraft.trim() || t.toLowerCase().includes(tagDraft.trim().toLowerCase())),
+    )
+    .slice(0, 6);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    const finalTags = tagDraft.trim()
+      ? Array.from(new Set([...tags, tagDraft.trim().toLowerCase().replace(/^#/, "")]))
+      : tags;
+
     if (!title.trim() || !code.trim()) {
       toast({
-        title: "Error",
-        description: "Title and code are required",
+        title: "Missing fields",
+        description: "Title and code are required.",
         variant: "destructive",
       });
       return;
     }
 
     setIsSubmitting(true);
-
     try {
-      const tags = tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
-
       const payload = {
         title: title.trim(),
         code,
         description: description.trim() || null,
         language,
-        tags,
+        tags: finalTags,
+        isPublic,
       };
-
-      const isEditing = isEditMode && snippetToEdit;
-      await apiRequest(
-        isEditing ? "PUT" : "POST",
-        isEditing ? `/api/snippets/${snippetToEdit.id}` : "/api/snippets",
-        payload,
-      );
-
-      toast({
-        title: "Success",
-        description: isEditing ? "Snippet updated successfully" : "Snippet created successfully",
-      });
-
-      setOpen(false);
-      invalidateSnippetQueries(queryClient);
-    } catch (error) {
-      console.error("Error saving snippet:", error);
-      toast({
-        title: "Error",
-        description: `Failed to ${isEditMode ? "update" : "create"} snippet. Please try again.`,
-        variant: "destructive",
-      });
+      if (isEditMode && snippetToEdit) {
+        await updateSnippet(snippetToEdit.id, payload);
+      } else {
+        await createSnippet(payload);
+      }
+      onOpenChange(false);
+    } catch {
+      // Error toast is already handled by SnippetContext mutation
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {!isControlled && (
-        <DialogTrigger asChild>
-          <Button size="sm" className="flex items-center">
-            <Plus className="h-4 w-4 mr-1" />
-            New Snippet
-          </Button>
-        </DialogTrigger>
-      )}
-      <DialogContent className="sm:max-w-[600px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[740px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? "Edit Snippet" : "Create New Snippet"}</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Snippet" : "New Snippet"}</DialogTitle>
           <DialogDescription>
             {isEditMode
-              ? "Update your existing code snippet"
-              : "Add a new code snippet to your collection"}
+              ? "Update your snippet code, tags, or visibility."
+              : "Save a reusable snippet with syntax highlighting and tags."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <label htmlFor="title" className="text-sm font-medium">Title</label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter snippet title"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label htmlFor="snippet-title">Title</Label>
+              <Input
+                id="snippet-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Debounced React hook"
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <label htmlFor="description" className="text-sm font-medium">Description</label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter a brief description"
-              rows={2}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="language" className="text-sm font-medium">Language</label>
+            <div className="space-y-1.5">
+              <Label htmlFor="snippet-lang">Language</Label>
               <Select value={language} onValueChange={setLanguage}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a language" />
+                <SelectTrigger id="snippet-lang">
+                  <SelectValue placeholder="Language" />
                 </SelectTrigger>
                 <SelectContent>
                   {LANGUAGES.map((lang) => (
@@ -190,35 +204,143 @@ export default function AddSnippetDialog({
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <label htmlFor="tags" className="text-sm font-medium">Tags (comma-separated)</label>
-              <Input
-                id="tags"
-                value={tagsInput}
-                onChange={(e) => setTagsInput(e.target.value)}
-                placeholder="react, hooks, utils"
-              />
-            </div>
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="code" className="text-sm font-medium">Code</label>
-            <Textarea
-              id="code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Paste your code here"
-              className="min-h-[150px] font-mono"
-              required
+          <div className="space-y-1.5">
+            <Label htmlFor="snippet-desc">Description (optional)</Label>
+            <Input
+              id="snippet-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Short context or usage note"
             />
           </div>
 
-          <DialogFooter className="mt-6">
+          {/* Tag chips with autocomplete */}
+          <div className="space-y-1.5">
+            <Label htmlFor="snippet-tags">Tags</Label>
+            <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary"
+                >
+                  #{tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="hover:text-destructive"
+                    aria-label={`Remove ${tag}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              <input
+                id="snippet-tags"
+                type="text"
+                value={tagDraft}
+                onChange={(e) => setTagDraft(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                placeholder={tags.length ? "Add tag..." : "Type a tag and press Enter"}
+                className="min-w-[140px] flex-1 bg-transparent py-0.5 text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+            {suggestedTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                <span className="text-[11px] text-muted-foreground mr-1">Suggestions:</span>
+                {suggestedTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => addTag(tag)}
+                    className="rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-primary/15 hover:text-primary transition-colors"
+                  >
+                    +{tag}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Code editor with Write / Preview toggle */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="snippet-code">Code</Label>
+              <div className="inline-flex rounded-md border border-border bg-muted p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(false)}
+                  className={`inline-flex items-center gap-1 rounded px-2.5 py-1 font-medium transition-colors ${
+                    !previewMode
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Code2 className="h-3.5 w-3.5" />
+                  Write
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(true)}
+                  className={`inline-flex items-center gap-1 rounded px-2.5 py-1 font-medium transition-colors ${
+                    previewMode
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Preview
+                </button>
+              </div>
+            </div>
+
+            {previewMode ? (
+              <div className="min-h-[220px] max-h-[340px] overflow-auto rounded-md border border-border">
+                <CodeBlock code={code || "// Nothing to preview yet"} language={language} />
+              </div>
+            ) : (
+              <Textarea
+                id="snippet-code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                onKeyDown={handleCodeKeyDown}
+                placeholder="Paste or type your code here (Tab inserts spaces)"
+                className="min-h-[220px] text-sm leading-relaxed code-scroll"
+                style={{
+                  fontFamily: `"${prefs.editorFont}", ui-monospace, SFMono-Regular, Menlo, monospace`,
+                }}
+                required
+              />
+            )}
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3.5 py-2.5">
+            <div className="flex items-center gap-2.5">
+              {isPublic ? (
+                <Globe className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <Lock className="h-4 w-4 text-muted-foreground" />
+              )}
+              <div>
+                <Label htmlFor="snippet-public" className="text-sm font-medium cursor-pointer">
+                  {isPublic ? "Public snippet" : "Private snippet"}
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {isPublic
+                    ? "Visible on the public gallery and via share links."
+                    : "Visible only to you."}
+                </p>
+              </div>
+            </div>
+            <Switch id="snippet-public" checked={isPublic} onCheckedChange={setIsPublic} />
+          </div>
+
+          <DialogFooter className="pt-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
               Cancel
@@ -226,10 +348,10 @@ export default function AddSnippetDialog({
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting
                 ? isEditMode
-                  ? "Updating..."
+                  ? "Saving..."
                   : "Creating..."
                 : isEditMode
-                  ? "Update Snippet"
+                  ? "Save Changes"
                   : "Create Snippet"}
             </Button>
           </DialogFooter>

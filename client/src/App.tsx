@@ -3,7 +3,7 @@ import { Redirect, Switch, Route } from "wouter";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { CodeThemeProvider } from "@/contexts/CodeThemeContext";
+import { PreferencesProvider } from "@/contexts/PreferencesContext";
 import { SnippetProvider } from "@/contexts/SnippetContext";
 import { CollectionProvider } from "@/contexts/CollectionContext";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -11,7 +11,6 @@ import { useAuthContext } from "@/contexts/AuthContext";
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Home = lazy(() => import("@/pages/Home"));
 const PublicHome = lazy(() => import("@/pages/PublicHome"));
-const Snippets = lazy(() => import("@/pages/Snippets"));
 const Collections = lazy(() => import("@/pages/Collections"));
 const CollectionDetail = lazy(() => import("@/pages/CollectionDetail"));
 const Tags = lazy(() => import("@/pages/Tags"));
@@ -19,8 +18,8 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const SharedSnippet = lazy(() => import("@/pages/SharedSnippet"));
 
 const PageLoader = () => (
-  <div className="h-screen flex items-center justify-center">
-    <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full" />
+  <div className="h-screen flex items-center justify-center bg-background">
+    <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
   </div>
 );
 
@@ -29,7 +28,7 @@ function AuthenticatedRouter() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/" component={Home} />
-        <Route path="/snippets" component={Snippets} />
+        <Route path="/snippets"><Redirect to="/" /></Route>
         <Route path="/collections" component={Collections} />
         <Route path="/collections/:id" component={CollectionDetail} />
         <Route path="/tags" component={Tags} />
@@ -69,10 +68,12 @@ const SignInTriggerPage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col items-center justify-center">
-      <div className="mb-4">{loading ? "Loading authentication..." : "Redirecting to sign-in..."}</div>
+    <div className="h-screen flex flex-col items-center justify-center bg-background">
+      <div className="mb-4 text-sm text-muted-foreground">
+        {loading ? "Loading authentication..." : "Redirecting to sign-in..."}
+      </div>
       {loading && (
-        <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full" />
+        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
       )}
     </div>
   );
@@ -82,17 +83,12 @@ export default function App() {
   const { user, loading } = useAuthContext();
 
   if (loading) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center">
-        <div className="mb-4">Loading...</div>
-        <div className="animate-spin h-8 w-8 border-t-2 border-b-2 border-blue-500 rounded-full" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (
     <ThemeProvider>
-      <CodeThemeProvider>
+      <PreferencesProvider>
         <SnippetProvider>
           <CollectionProvider>
             <TooltipProvider>
@@ -101,7 +97,7 @@ export default function App() {
             </TooltipProvider>
           </CollectionProvider>
         </SnippetProvider>
-      </CodeThemeProvider>
+      </PreferencesProvider>
     </ThemeProvider>
   );
 }

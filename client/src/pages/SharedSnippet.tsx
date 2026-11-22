@@ -1,18 +1,40 @@
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Snippet } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
-import { Copy, Star, ArrowLeft } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Star,
+  ArrowLeft,
+  Download,
+  FileCode2,
+  ExternalLink,
+  Hash,
+  WrapText,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getLanguageColor } from "@/lib/constants";
+import { downloadSnippetFile, formatSnippetMarkdown } from "@/lib/snippets";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { usePreferences } from "@/contexts/PreferencesContext";
+import { cn } from "@/lib/utils";
 import CodeBlock from "@/components/CodeBlock";
 import CommentSection from "@/components/CommentSection";
 
 export default function SharedSnippet() {
   const [, navigate] = useLocation();
   const { shareId } = useParams();
+  const { prefs } = usePreferences();
+  const [showLineNumbers, setShowLineNumbers] = useState(prefs.showLineNumbers);
+  const [wordWrap, setWordWrap] = useState(prefs.wordWrap);
+
   const { isCopying, copy } = useCopyToClipboard();
+  const { isCopying: copiedMd, copy: copyMd } = useCopyToClipboard({
+    successTitle: "Markdown copied!",
+    successDescription: "Fenced code block copied to clipboard.",
+  });
 
   const { data: snippet, isLoading, error } = useQuery<Snippet>({
     queryKey: [`/api/shared/${shareId}`],
@@ -22,112 +44,165 @@ export default function SharedSnippet() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="w-12 h-12 border-4 border-t-blue-500 border-solid rounded-full animate-spin" />
-        <p className="mt-4 text-lg">Loading snippet...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <p className="mt-4 text-sm text-muted-foreground">Loading snippet...</p>
       </div>
     );
   }
 
   if (error || !snippet) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-        <h2 className="mb-4 text-2xl font-bold">Snippet Not Found</h2>
-        <p className="mb-6 text-gray-600 dark:text-gray-400">
-          The snippet you&apos;re looking for either doesn&apos;t exist or is not public.
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
+        <h2 className="mb-2 text-2xl font-bold text-foreground">Snippet Not Found</h2>
+        <p className="mb-6 text-sm text-muted-foreground">
+          This snippet either does not exist or is set to private.
         </p>
         <Button onClick={() => navigate("/")}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to CodePatchwork
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="container max-w-4xl py-8 mx-auto">
-      <Button variant="outline" className="mb-6" onClick={() => navigate("/")}>
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Home
-      </Button>
+    <div className="min-h-screen bg-background py-8 px-4">
+      <div className="mx-auto max-w-4xl">
+        <Button variant="ghost" size="sm" className="-ml-2 mb-5 gap-1.5" onClick={() => navigate("/")}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to CodePatchwork
+        </Button>
 
-      <div className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shadow-sm">
-        <div className="p-6">
-          <div className="flex justify-between items-start mb-4">
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
-              {snippet.title}
-            </h1>
-            {snippet.isFavorite && <Star className="h-5 w-5 text-amber-400" fill="currentColor" />}
-          </div>
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="p-6">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="h-3 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: getLanguageColor(snippet.language) }}
+                />
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                  {snippet.title}
+                </h1>
+                {snippet.isFavorite && (
+                  <Star className="h-5 w-5 text-amber-400" fill="currentColor" />
+                )}
+              </div>
 
-          {snippet.description && (
-            <p className="text-slate-500 dark:text-slate-400 mb-4">{snippet.description}</p>
-          )}
-
-          <div className="mb-6 flex flex-wrap gap-1">
-            {snippet.language && (
-              <span className="text-xs py-1 px-2 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
-                {snippet.language}
-              </span>
-            )}
-            {snippet.tags?.map((tag) => (
-              <span
-                key={tag}
-                className="text-xs py-1 px-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-
-          <div className="relative rounded-md bg-slate-50 dark:bg-slate-800 overflow-hidden border border-slate-200 dark:border-slate-700">
-            <div className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-700 rounded-bl text-xs px-2 py-1 flex items-center">
-              {snippet.language && (
-                <>
-                  <span
-                    className="w-2 h-2 rounded-full mr-1"
-                    style={{ backgroundColor: getLanguageColor(snippet.language) }}
-                  />
-                  <span className="text-slate-700 dark:text-slate-300 mr-2">
-                    {snippet.language}
-                  </span>
-                </>
-              )}
-              <button
-                type="button"
-                className={
-                  isCopying
-                    ? "text-green-500"
-                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                }
-                aria-label="Copy code"
-                onClick={() => snippet.code && copy(snippet.code)}
-                disabled={isCopying}
-              >
-                <Copy className={`h-4 w-4 ${isCopying ? "animate-ping" : ""}`} />
-              </button>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() => copy(snippet.code || "")}
+                >
+                  {isCopying ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  {isCopying ? "Copied" : "Copy"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() => copyMd(formatSnippetMarkdown(snippet))}
+                >
+                  {copiedMd ? <Check className="h-3.5 w-3.5" /> : <FileCode2 className="h-3.5 w-3.5" />}
+                  Markdown
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() => downloadSnippetFile(snippet)}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download
+                </Button>
+                {shareId && (
+                  <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" asChild>
+                    <a
+                      href={`/api/shared/${encodeURIComponent(shareId)}/raw`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Raw
+                    </a>
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <div className="mt-8 p-4">
+            {snippet.description && (
+              <p className="mb-4 text-sm text-muted-foreground">{snippet.description}</p>
+            )}
+
+            <div className="mb-5 flex flex-wrap gap-1.5">
+              {snippet.language && (
+                <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                  {snippet.language}
+                </span>
+              )}
+              {snippet.tags?.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-md bg-muted px-2.5 py-0.5 text-xs text-muted-foreground"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-border">
+              <div className="flex items-center justify-between border-b border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+                <span>
+                  {snippet.code.split("\n").length}{" "}
+                  {snippet.code.split("\n").length === 1 ? "line" : "lines"}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowLineNumbers((v) => !v)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px]",
+                      showLineNumbers ? "bg-primary/15 text-primary font-medium" : "hover:bg-muted",
+                    )}
+                  >
+                    <Hash className="h-3 w-3" />
+                    Lines
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWordWrap((v) => !v)}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px]",
+                      wordWrap ? "bg-primary/15 text-primary font-medium" : "hover:bg-muted",
+                    )}
+                  >
+                    <WrapText className="h-3 w-3" />
+                    Wrap
+                  </button>
+                </div>
+              </div>
               <CodeBlock
                 code={snippet.code || ""}
                 language={snippet.language || "text"}
-                showLineNumbers={true}
+                showLineNumbers={showLineNumbers}
+                wordWrap={wordWrap}
               />
             </div>
           </div>
-        </div>
 
-        <div className="border-t border-slate-200 dark:border-slate-700 px-6 py-3 text-xs text-slate-500 dark:text-slate-400 flex justify-between items-center">
-          <span>Updated {formatDistanceToNow(new Date(snippet.updatedAt), { addSuffix: true })}</span>
-          <span>{snippet.viewCount || 0} uses</span>
-        </div>
-
-        {snippet.id && (
-          <div className="px-6 pb-6">
-            <CommentSection snippetId={snippet.id} />
+          <div className="flex items-center justify-between border-t border-border bg-muted/25 px-6 py-3 text-xs text-muted-foreground">
+            <span>Updated {formatDistanceToNow(new Date(snippet.updatedAt), { addSuffix: true })}</span>
+            <span>{snippet.viewCount || 0} views</span>
           </div>
-        )}
+
+          {snippet.id && (
+            <div className="border-t border-border px-6 pb-6">
+              <CommentSection snippetId={snippet.id} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
