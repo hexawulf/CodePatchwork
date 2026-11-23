@@ -4,6 +4,22 @@ All notable changes to CodePatchwork are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-11-23
+
+### Changed
+- Replaced favicons with the Teal CP rounded-square icon matching the 2.0 brand mark (`public/favicon*`, `public/apple-touch-icon.png`, `theme-color: #0d9488`).
+- Raised light-theme `--primary`, `--destructive`, and `--muted-foreground` contrast ratios to pass WCAG AA (white-on-primary `3.41:1` → `5.87:1`); removed `maximum-scale=1` viewport zoom restriction.
+- Tightened `PublicHome` hero and mobile layout density so code previews render above the fold, added the `CP` brand badge to mobile header, wired `FilterBadges`, result counts, and clickable card language/tag filters on `PublicHome`, and hid the redundant `Public` pill in public gallery view.
+- Aligned `.env.example`, `AGENTS.md`, `client/AGENTS.md`, `server/AGENTS.md`, `shared/AGENTS.md`, and `CONTRIBUTING.md` with the v2.1 architecture and test tooling.
+
+### Fixed
+- Gated `CommentSection` submission behind authentication (signed-out users now see a compact Sign In prompt instead of a form that failed with 401) and switched comment styling to semantic design tokens.
+- Routed unknown public URLs (`/does-not-exist`) to `NotFound` instead of silently rendering `PublicHome`, modernized `not-found.tsx` with semantic tokens and `<Button asChild>`, and extracted clean messages from JSON API error payloads in `SnippetGrid`.
+- Resolved broken `primary-500`/`primary-50` selection classes in `AddToCollectionDialog`, fixed ESLint `react-hooks/exhaustive-deps` warning in `CommandPalette`, synced `SnippetDrawer` line-number/wrap toggles with `PreferencesContext`, URL-encoded `shareId` in the drawer Raw link, and eliminated `$&`/`$1` regex replacer corruption in `injectShareMeta`.
+
+### Removed
+- Removed 14 obsolete root/script/asset leftovers (`plan.md`, Replit PRD in `attached_assets/`, unused `generated-icon.png` and `codepatchwork-banner.png`, `import_snippets.sql`, `db_migration.sh`, legacy `scripts/*.js`/`scripts/*.ts`/`scripts/github-migration.sh`, unused `checkbox.tsx` primitive), unused `@assets` Vite alias, and unused `server/db.ts` `query()` export.
+
 ## [2.1.0] - 2026-11-22
 
 ### Added

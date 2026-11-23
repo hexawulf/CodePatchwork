@@ -28,7 +28,7 @@ export default function AboutModal({ open, onOpenChange }: AboutModalProps) {
         <section className="space-y-5 py-3 text-sm">
           <Fragment>
             <h2 className="text-xl font-semibold text-center text-primary">
-              CodePatchwork v2.1.0
+              CodePatchwork v2.1.1
             </h2>
             <p className="text-center text-muted-foreground">Released November 2026</p>
           </Fragment>
