@@ -13,6 +13,24 @@ interface SnippetGridProps {
   viewMode: "grid" | "list";
   isPublicView?: boolean;
   onRemoveFromCollection?: (snippetId: number) => void;
+  onSelectLanguage?: (language: string) => void;
+  onSelectTag?: (tag: string) => void;
+}
+
+function formatErrorMessage(error: Error): string {
+  const raw = error.message || "Unexpected error";
+  const match = raw.match(/^\d+:\s*(\{[\s\S]*\})$/);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]) as { message?: unknown };
+      if (typeof parsed.message === "string" && parsed.message.trim()) {
+        return parsed.message.trim();
+      }
+    } catch {
+      // Fall back to raw message
+    }
+  }
+  return raw;
 }
 
 export default function SnippetGrid({
@@ -22,6 +40,8 @@ export default function SnippetGrid({
   viewMode,
   isPublicView = false,
   onRemoveFromCollection,
+  onSelectLanguage,
+  onSelectTag,
 }: SnippetGridProps) {
   const { openCreateEditor } = useSnippetContext();
 
@@ -29,8 +49,8 @@ export default function SnippetGrid({
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Error</AlertTitle>
-        <AlertDescription>Failed to load snippets: {error.message}</AlertDescription>
+        <AlertTitle>Unable to load snippets</AlertTitle>
+        <AlertDescription>{formatErrorMessage(error)}</AlertDescription>
       </Alert>
     );
   }
@@ -94,6 +114,8 @@ export default function SnippetGrid({
           viewMode={viewMode}
           isPublicView={isPublicView}
           onRemoveFromCollection={onRemoveFromCollection}
+          onSelectLanguage={onSelectLanguage}
+          onSelectTag={onSelectTag}
         />
       ))}
     </div>

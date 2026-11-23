@@ -1,22 +1,24 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { useAuthContext } from "@/contexts/AuthContext";
 import type { Comment } from "@shared/schema";
-import { apiRequest } from '@/lib/queryClient';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface CommentSectionProps {
   snippetId: number;
 }
 
 export default function CommentSection({ snippetId }: CommentSectionProps) {
-  const [newComment, setNewComment] = useState('');
+  const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { isAuthenticated, signIn } = useAuthContext();
   const queryClient = useQueryClient();
 
   const { data: comments, isLoading, error } = useQuery<Comment[]>({
@@ -25,29 +27,28 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newComment.trim()) return;
-    
+
     try {
       setIsSubmitting(true);
-      
-      await apiRequest('POST', `/api/snippets/${snippetId}/comments`, {
+
+      await apiRequest("POST", `/api/snippets/${snippetId}/comments`, {
         content: newComment,
       });
-      
+
       toast({
-        title: 'Comment posted',
-        description: 'Your comment has been successfully added.',
+        title: "Comment posted",
+        description: "Your comment has been successfully added.",
       });
-      
-      // Clear the form and refetch comments
-      setNewComment('');
+
+      setNewComment("");
       queryClient.invalidateQueries({ queryKey: [`/api/snippets/${snippetId}/comments`] });
     } catch {
       toast({
-        title: 'Error',
-        description: 'Failed to post your comment. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to post your comment. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -57,10 +58,10 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
   if (isLoading) {
     return (
       <div className="mt-6 space-y-4">
-        <h3 className="text-lg font-medium">Comments</h3>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="flex space-x-4">
-            <Skeleton className="h-10 w-10 rounded-full" />
+        <h3 className="text-base font-semibold text-foreground">Comments</h3>
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="flex space-x-3">
+            <Skeleton className="h-9 w-9 rounded-full" />
             <div className="space-y-2 flex-1">
               <Skeleton className="h-4 w-1/4" />
               <Skeleton className="h-4 w-full" />
@@ -73,7 +74,7 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
 
   if (error) {
     return (
-      <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-md">
+      <div className="mt-6 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
         <p>Failed to load comments. Please try again later.</p>
       </div>
     );
@@ -81,46 +82,63 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
 
   return (
     <div className="mt-6">
-      <h3 className="text-lg font-medium mb-4">Comments</h3>
-      
-      <form onSubmit={handleSubmitComment} className="mb-6">
-        <Textarea
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Add a comment..."
-          className="mb-2 min-h-[100px]"
-        />
-        <Button 
-          type="submit" 
-          disabled={isSubmitting || !newComment.trim()}
-        >
-          {isSubmitting ? 'Posting...' : 'Post Comment'}
-        </Button>
-      </form>
-      
-      <div className="space-y-4">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-base font-semibold text-foreground">
+          Comments{comments && comments.length > 0 ? ` (${comments.length})` : ""}
+        </h3>
+      </div>
+
+      {isAuthenticated ? (
+        <form onSubmit={handleSubmitComment} className="mb-5">
+          <Textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Add a comment..."
+            className="mb-2 min-h-[88px]"
+          />
+          <Button type="submit" size="sm" disabled={isSubmitting || !newComment.trim()}>
+            {isSubmitting ? "Posting..." : "Post Comment"}
+          </Button>
+        </form>
+      ) : (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
+          <span className="text-muted-foreground">Sign in to join the discussion.</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => signIn()}>
+            Sign In
+          </Button>
+        </div>
+      )}
+
+      <div className="space-y-3">
         {comments && comments.length > 0 ? (
           comments.map((comment) => (
-            <div key={comment.id} className="flex space-x-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-md">
-              <Avatar>
-                <AvatarFallback>
-                  {comment.userId ? comment.userId.charAt(0).toUpperCase() : 'A'}
+            <div
+              key={comment.id}
+              className="flex space-x-3 rounded-lg border border-border/70 bg-muted/35 p-3.5"
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+                  {comment.userId ? comment.userId.charAt(0).toUpperCase() : "A"}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{comment.userId || 'Anonymous'}</span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {comment.userId || "Anonymous"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="mt-1">{comment.content}</p>
+                <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap break-words">
+                  {comment.content}
+                </p>
               </div>
             </div>
           ))
         ) : (
-          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-            <p>No comments yet. Be the first to comment!</p>
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            <p>No comments yet.</p>
           </div>
         )}
       </div>

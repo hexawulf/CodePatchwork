@@ -53,6 +53,8 @@ interface SnippetCardProps {
   viewMode: "grid" | "list";
   isPublicView?: boolean;
   onRemoveFromCollection?: (snippetId: number) => void;
+  onSelectLanguage?: (language: string) => void;
+  onSelectTag?: (tag: string) => void;
 }
 
 const SnippetCard = memo(function SnippetCard({
@@ -60,6 +62,8 @@ const SnippetCard = memo(function SnippetCard({
   viewMode,
   isPublicView = false,
   onRemoveFromCollection,
+  onSelectLanguage,
+  onSelectTag,
 }: SnippetCardProps) {
   const {
     toggleFavorite,
@@ -257,31 +261,47 @@ const SnippetCard = memo(function SnippetCard({
 
         {/* Language, tags, and inline visibility */}
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          {snippet.language && (
-            <button
-              type="button"
-              onClick={() => !isPublicView && toggleLanguage(snippet.language)}
-              className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20 transition-colors"
-            >
-              {snippet.language}
-            </button>
-          )}
-          {snippet.isPublic && (
+          {snippet.language &&
+            (onSelectLanguage || !isPublicView ? (
+              <button
+                type="button"
+                onClick={() =>
+                  onSelectLanguage ? onSelectLanguage(snippet.language) : toggleLanguage(snippet.language)
+                }
+                className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20 transition-colors"
+              >
+                {snippet.language}
+              </button>
+            ) : (
+              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                {snippet.language}
+              </span>
+            ))}
+          {!isPublicView && snippet.isPublic && (
             <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
               <Globe className="h-3 w-3" />
               Public
             </span>
           )}
-          {snippet.tags?.slice(0, 4).map((tag) => (
-            <button
-              type="button"
-              key={tag}
-              onClick={() => !isPublicView && toggleTag(tag)}
-              className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            >
-              #{tag}
-            </button>
-          ))}
+          {snippet.tags?.slice(0, 4).map((tag) =>
+            onSelectTag || !isPublicView ? (
+              <button
+                type="button"
+                key={tag}
+                onClick={() => (onSelectTag ? onSelectTag(tag) : toggleTag(tag))}
+                className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                #{tag}
+              </button>
+            ) : (
+              <span
+                key={tag}
+                className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+              >
+                #{tag}
+              </span>
+            ),
+          )}
           {snippet.tags && snippet.tags.length > 4 && (
             <span className="text-[11px] text-muted-foreground">+{snippet.tags.length - 4}</span>
           )}

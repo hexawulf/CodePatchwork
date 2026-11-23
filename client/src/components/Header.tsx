@@ -71,6 +71,9 @@ export default function Header({
             <Menu className="h-5 w-5" />
           </button>
         )}
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
+          CP
+        </span>
         <span className="font-semibold tracking-tight text-foreground">CodePatchwork</span>
       </div>
 

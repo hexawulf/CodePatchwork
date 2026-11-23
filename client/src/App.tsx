@@ -48,7 +48,12 @@ function PublicRouter() {
         <Route path="/" component={PublicHome} />
         <Route path="/login" component={SignInTriggerPage} />
         <Route path="/shared/:shareId" component={SharedSnippet} />
-        <Route component={PublicHome} />
+        <Route path="/snippets"><Redirect to="/" /></Route>
+        <Route path="/collections"><Redirect to="/" /></Route>
+        <Route path="/collections/:id"><Redirect to="/" /></Route>
+        <Route path="/tags"><Redirect to="/" /></Route>
+        <Route path="/settings"><Redirect to="/" /></Route>
+        <Route component={NotFound} />
       </Switch>
     </Suspense>
   );
