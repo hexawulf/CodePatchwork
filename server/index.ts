@@ -56,6 +56,7 @@ const frameSrc = [
 
 app.use(
   helmet({
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     crossOriginOpenerPolicy: { policy: "unsafe-none" },
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
@@ -131,8 +132,10 @@ app.use((req, res, next) => {
   }
 
   const port = Number(process.env.PORT) || 3001;
-  server.listen({ host: "0.0.0.0", port, reusePort: true }, () => {
-    logger.info(`Serving on port ${port}`);
+  // Loopback only: nginx on the same host is the only client. Set HOST to override.
+  const host = process.env.HOST || "127.0.0.1";
+  server.listen({ host, port, reusePort: true }, () => {
+    logger.info(`Serving on ${host}:${port}`);
   });
 
   const shutdown = (signal: string) => {
