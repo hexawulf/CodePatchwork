@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -76,7 +76,7 @@ export default function CommandPalette() {
     }
   }, [isCommandOpen]);
 
-  const close = () => setCommandOpen(false);
+  const close = useCallback(() => setCommandOpen(false), [setCommandOpen]);
 
   const allItems = useMemo<CommandItem[]>(() => {
     const actions: CommandItem[] = [
@@ -190,6 +190,7 @@ export default function CommandPalette() {
     theme,
     snippets,
     collections,
+    close,
     openCreateEditor,
     openInspector,
     setImportExportOpen,

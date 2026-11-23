@@ -502,6 +502,14 @@ describe("OpenGraph meta injection", () => {
     expect(out).toContain("<title>A &quot;quote&quot; &amp; &lt;tag&gt; — CodePatchwork</title>");
     expect(out).toContain('og:description" content="Use &lt;b&gt;now&lt;/b&gt;"');
   });
+
+  it("preserves regex replacement tokens like $& and $1 literally", () => {
+    const html =
+      '<title>Old</title><meta property="og:title" content="Old"><meta property="og:description" content="Desc">';
+    const out = injectShareMeta(html, "jQuery $& $1 helper", "Price $& per $1");
+    expect(out).toContain("<title>jQuery $&amp; $1 helper — CodePatchwork</title>");
+    expect(out).toContain('og:description" content="Price $&amp; per $1"');
+  });
 });
 
 describe("tags and languages (CP-06)", () => {

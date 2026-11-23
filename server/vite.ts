@@ -21,14 +21,14 @@ export function injectShareMeta(html: string, title: string, description: string
   const safeTitle = escapeHtmlAttr(`${title} — CodePatchwork`);
   const safeDesc = escapeHtmlAttr(description);
   return html
-    .replace(/<title>[^<]*<\/title>/, `<title>${safeTitle}</title>`)
+    .replace(/<title>[^<]*<\/title>/, () => `<title>${safeTitle}</title>`)
     .replace(
       /<meta property="og:title" content="[^"]*"\s*\/?>/,
-      `<meta property="og:title" content="${safeTitle}">`,
+      () => `<meta property="og:title" content="${safeTitle}">`,
     )
     .replace(
       /<meta property="og:description" content="[^"]*"\s*\/?>/,
-      `<meta property="og:description" content="${safeDesc}">`,
+      () => `<meta property="og:description" content="${safeDesc}">`,
     );
 }
 

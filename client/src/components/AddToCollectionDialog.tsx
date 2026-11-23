@@ -63,13 +63,13 @@ export default function AddToCollectionDialog({
 
         {isLoading ? (
           <div className="flex justify-center py-6">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : collections.length === 0 ? (
           <div className="text-center py-6">
-            <FolderPlus className="h-10 w-10 mx-auto text-slate-400 mb-2" />
-            <p className="text-slate-700 dark:text-slate-300 font-medium mb-1">No collections yet</p>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">
+            <FolderPlus className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+            <p className="text-foreground font-medium mb-1">No collections yet</p>
+            <p className="text-muted-foreground text-sm">
               Create a collection first to add snippets to it.
             </p>
           </div>
@@ -77,29 +77,30 @@ export default function AddToCollectionDialog({
           <ScrollArea className="max-h-[300px] overflow-y-auto pr-3">
             <div className="space-y-2 py-2">
               {collections.map((collection) => (
-                <div
+                <button
+                  type="button"
                   key={collection.id}
-                  className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                  className={`w-full text-left border rounded-md p-3 cursor-pointer transition-colors ${
                     selectedCollectionId === collection.id
-                      ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"
-                      : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-primary/40 hover:bg-muted/40"
                   }`}
                   onClick={() => handleSelectCollection(collection.id)}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-slate-900 dark:text-white">{collection.name}</p>
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground truncate">{collection.name}</p>
                       {collection.description && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                           {collection.description}
                         </p>
                       )}
                     </div>
                     {selectedCollectionId === collection.id && (
-                      <Check className="h-5 w-5 text-primary-500" />
+                      <Check className="h-5 w-5 shrink-0 text-primary" />
                     )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </ScrollArea>
