@@ -1,8 +1,9 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { createLogger, format, transports } from "winston";
 
-const logDir = process.env.LOG_DIR || "/home/zk/logs";
+const logDir = process.env.LOG_DIR || path.join(os.homedir(), "logs");
 const logFile = path.join(logDir, "codepatchwork.log");
 
 if (!fs.existsSync(logDir)) {
