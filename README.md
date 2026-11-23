@@ -1,7 +1,7 @@
 # CodePatchwork
 
 [![Live](https://img.shields.io/badge/Live-codepatchwork.com-0d9488?style=flat-square)](https://codepatchwork.com)
-[![Version](https://img.shields.io/badge/version-2.1.1-0d9488?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-2.1.2-0d9488?style=flat-square)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](package.json)
 [![CI](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml/badge.svg)](https://github.com/hexawulf/CodePatchwork/actions/workflows/ci.yml)
 

@@ -4,6 +4,18 @@ All notable changes to CodePatchwork are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] - 2026-11-23
+
+### Security
+- Comments no longer expose the commenter's Firebase UID: `GET /api/snippets/:id/comments` returns `authorName` (from `users.display_name`, fallback `Anonymous`) instead of `userId`. No schema change.
+- The server listens on `127.0.0.1` by default (`HOST` overrides); nginx on the same host is the only client.
+- helmet now sends `Referrer-Policy: strict-origin-when-cross-origin`, the value production already used via nginx (needed for Firebase auth). The nginx vhost no longer duplicates helmet's security headers.
+
+### Changed
+- Dependencies: Dependabot minor/patch group #26 (22 updates, including Radix UI primitives, TanStack Query 5.108, helmet 8.3, pg 8.23, drizzle-orm 0.45.4, wouter 3.13).
+- Dependabot ignores TypeScript 7 and React 19 majors until a planned migration (#21 and #22 closed; both failed CI).
+- `LOG_DIR` defaults to `~/logs` via `os.homedir()` instead of a hardcoded home path; removed a duplicate `.gitignore` line.
+
 ## [2.1.1] - 2026-11-23
 
 ### Changed
