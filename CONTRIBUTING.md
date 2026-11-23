@@ -52,7 +52,7 @@ Enhancement suggestions are tracked as GitHub issues. When suggesting an enhance
 
 ### Prerequisites
 
-- Node.js (v18+)
+- Node.js (v20+)
 - PostgreSQL database
 - Firebase project (for authentication)
 
@@ -85,8 +85,8 @@ Enhancement suggestions are tracked as GitHub issues. When suggesting an enhance
 
 ### Testing
 
-- Write tests for new features
-- Ensure existing tests pass before submitting pull requests
+- Write tests for new features (`server/__tests__/`, `client/src/lib/__tests__/`, `e2e/`)
+- Run `npm run lint`, `npm run check`, and `npm test` before submitting pull requests
 
 ## License
 

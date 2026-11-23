@@ -28,8 +28,11 @@ npm start
 # Push database schema changes
 npm run db:push
 
-# Test Winston logger (after build)
-npm run test:logger
+# Run unit & route tests
+npm test
+
+# Run real PostgreSQL integration tests
+TEST_DATABASE_URL=postgresql://... npm run test:int
 ```
 
 ---
@@ -40,16 +43,15 @@ npm run test:logger
 
 ```
 server/
-├── index.ts         # Server entry point (Express app, WebSocket, Vite dev)
-├── routes.ts        # ALL API routes (~1100 lines)
-├── storage.ts       # Database operations (~1200 lines, implements IStorage)
-├── simple-storage.ts # Legacy/simple storage (not used in production)
+├── index.ts         # Server entry point (Express app, Helmet CSP, rate limiting, Vite/static)
+├── routes.ts        # Param validation, /api/health, and modular route registration
+├── routes/          # auth.ts, snippets.ts, collections.ts, comments.ts, helpers.ts
+├── middleware/      # auth.ts (Firebase token verification), rateLimit.ts
+├── storage.ts       # Database operations (implements IStorage)
 ├── db.ts            # PostgreSQL connection pool
-├── logger.ts        # Winston logger configuration
-├── vite.ts          # Vite dev server integration (development only)
-└── __tests__/       # Test files
-    ├── routes.test.ts
-    └── storage.test.ts
+├── logger.ts        # Winston logger configuration (LOG_DIR configurable)
+├── vite.ts          # Vite dev middleware + static serving + OG meta injection
+└── __tests__/       # Vitest unit, route, rate-limit, and PostgreSQL integration tests
 ```
 
 ### Naming Conventions
@@ -480,23 +482,7 @@ git commit -m "Add new table: xyz"
 
 ## Testing
 
-**Note**: Tests exist in `server/__tests__/` but no test runner is configured in package.json yet.
-
-Example test structure:
-```
-server/
-├── routes.ts
-├── storage.ts
-└── __tests__/
-    ├── routes.test.ts
-    └── storage.test.ts
-```
-
-When test runner is added, run:
-```bash
-# (Future) Run server tests
-npm run test:server  # Not yet implemented
-```
+Server unit, route, and rate-limit tests live in `server/__tests__/` and run via Vitest (`npm test`). Real PostgreSQL integration tests live in `server/__tests__/storage.integration.test.ts` and run via `npm run test:int` when `TEST_DATABASE_URL` is set.
 
 ---
 

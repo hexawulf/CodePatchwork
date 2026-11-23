@@ -38,8 +38,8 @@ client/src/
 │   ├── *Dialog.tsx  # Modal/dialog components
 │   ├── *Card.tsx    # Card-based display components
 │   └── *.tsx        # Feature components
-├── pages/           # Route pages (Home, Snippets, Collections, Settings)
-├── hooks/           # Custom React hooks (useSnippets, useAuthenticatedFetch, use-toast)
+├── pages/           # Route pages (Home, PublicHome, Collections, CollectionDetail, Tags, Settings, SharedSnippet)
+├── hooks/           # Custom React hooks (useSnippets, use-copy-to-clipboard, use-toast)
 ├── contexts/        # React Context providers (AuthContext, ThemeContext, etc.)
 ├── lib/             # Utilities and configuration
 │   ├── firebase.ts  # Firebase client SDK
@@ -216,10 +216,10 @@ const data = await apiRequest<Snippet[]>("/api/snippets");
 ### Important Contexts
 
 - **AuthContext**: User authentication state, login/logout
-- **ThemeContext**: Dark/light mode toggle
-- **SnippetContext**: Snippet CRUD operations (uses TanStack Query internally)
+- **ThemeContext**: Dark/light/system mode toggle
+- **SnippetContext**: Snippet filters, global overlays, and CRUD mutations
 - **CollectionContext**: Collection management
-- **CodeThemeContext**: Prism.js syntax theme selection
+- **PreferencesContext**: Prism.js syntax theme, font, tab width, line numbers, word wrap, and layout
 
 ---
 
@@ -344,21 +344,7 @@ ls .env.example
 
 ## Testing
 
-**Note**: Tests exist in `client/src/components/__tests__/` but no test runner is configured in package.json yet.
-
-Example test structure:
-```
-client/src/components/
-├── SnippetCard.tsx
-└── __tests__/
-    └── SnippetCard.test.tsx
-```
-
-When test runner is added, run:
-```bash
-# (Future) Run client tests
-npm run test:client  # Not yet implemented
-```
+Client utility unit tests live in `client/src/lib/__tests__/client-utils.test.ts` and run under Vitest via `npm test`. End-to-end smoke tests live in `e2e/smoke.spec.ts` and run via `npm run test:e2e`.
 
 ---
 

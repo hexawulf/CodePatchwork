@@ -28,8 +28,7 @@ npm run db:push
 
 ```
 shared/
-├── schema.ts        # All Drizzle tables + Zod schemas
-└── schema.ts.backup # Backup (ignore this)
+└── schema.ts        # All Drizzle tables + Zod schemas
 ```
 
 **Everything lives in `schema.ts`** — one file for all tables and types.

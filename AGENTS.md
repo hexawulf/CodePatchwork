@@ -21,8 +21,20 @@ npm run dev
 # Build for production (client + server)
 npm run build
 
+# Lint
+npm run lint
+
 # Typecheck
 npm run check
+
+# Unit & route tests
+npm test
+
+# PostgreSQL integration tests (requires TEST_DATABASE_URL)
+npm run test:int
+
+# Playwright E2E smoke tests
+npm run test:e2e
 
 # Database: Push schema changes
 npm run db:push
@@ -35,7 +47,7 @@ npm run db:push
 ### Code Style
 - **TypeScript strict mode** enabled
 - **ESM modules** (`"type": "module"`)
-- **Path aliases**: `@/` (client/src), `@shared/` (shared types), `@assets/` (assets)
+- **Path aliases**: `@/` (client/src), `@shared/` (shared types)
 - **Functional React components** with hooks (no class components)
 - **TailwindCSS** for all styling (no inline styles)
 
@@ -71,7 +83,9 @@ client/          → Frontend React app [see client/AGENTS.md](client/AGENTS.md)
     lib/         → Utilities, Firebase config, query client
 
 server/          → Backend Express API [see server/AGENTS.md](server/AGENTS.md)
-  routes.ts      → All API endpoints (1100+ lines)
+  routes.ts      → Route registration, param validation, /api/health
+  routes/        → Modular routers (auth, snippets, collections, comments, helpers)
+  middleware/    → Firebase auth verification + express-rate-limit
   storage.ts     → Database operations (Drizzle)
   db.ts          → PostgreSQL pool
   logger.ts      → Winston logger
@@ -114,13 +128,13 @@ npm run check
 
 Before creating a PR, ensure:
 
-1. ✅ Code typechecks: `npm run check`
-2. ✅ Client builds: `npm run build` succeeds
-3. ✅ No hardcoded credentials (run `scripts/check-no-hardcode.sh`)
-4. ✅ Firebase env vars use `VITE_` prefix for client-side
-5. ✅ Database migrations tested if `shared/schema.ts` changed
-
-**Note**: Tests exist in `__tests__` directories but no test runner is configured in package.json yet.
+1. ✅ Code lints cleanly: `npm run lint`
+2. ✅ Code typechecks: `npm run check`
+3. ✅ Tests pass: `npm test` (plus `npm run test:int` and `npm run test:e2e` for DB/UI changes)
+4. ✅ Client + server build succeeds: `npm run build`
+5. ✅ No hardcoded credentials (run `scripts/check-no-hardcode.sh`)
+6. ✅ Firebase env vars use `VITE_` prefix for client-side
+7. ✅ Database migrations tested if `shared/schema.ts` changed
 
 ---
 
@@ -155,7 +169,7 @@ Before creating a PR, ensure:
 | Layer | Technologies |
 |-------|-------------|
 | **Frontend** | React 18, TypeScript, Vite, TailwindCSS, Shadcn UI, Prism.js, Wouter, TanStack Query |
-| **Backend** | Express, TypeScript, esbuild, Firebase Admin, Winston, express-session |
+| **Backend** | Express, TypeScript, esbuild, Firebase Admin, Helmet, express-rate-limit, Winston |
 | **Database** | PostgreSQL, Drizzle ORM, Drizzle Kit |
 | **Auth** | Firebase Authentication (Google OAuth + Email/Password) |
 | **Validation** | Zod (schemas in `shared/schema.ts`) |
