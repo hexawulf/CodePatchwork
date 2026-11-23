@@ -145,7 +145,9 @@ vi.mock("../storage", () => {
     removeSnippetFromCollection: async () => undefined,
     getComment: async (id: number) => state.comments.get(id),
     getCommentsBySnippetId: async (snippetId: number) =>
-      [...state.comments.values()].filter((c) => c.snippetId === snippetId),
+      [...state.comments.values()]
+        .filter((c) => c.snippetId === snippetId)
+        .map(({ userId, ...c }) => ({ ...c, authorName: userId ? `name-of-${userId}` : "Anonymous" })),
     createComment: async (c: any) => {
       const row = { id: state.nextId++, ...c };
       state.comments.set(row.id, row);
@@ -309,6 +311,8 @@ describe("comments (CP-03)", () => {
     const pub = await request(app).get("/api/snippets/2/comments");
     expect(pub.status).toBe(200);
     expect(pub.body).toHaveLength(1);
+    expect(pub.body[0]).not.toHaveProperty("userId");
+    expect(pub.body[0].authorName).toBe("name-of-bob");
   });
 
   it("refuses a comment on another user's private snippet", async () => {

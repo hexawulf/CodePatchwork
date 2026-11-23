@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthContext } from "@/contexts/AuthContext";
-import type { Comment } from "@shared/schema";
+import type { CommentView } from "@shared/types";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +21,7 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
   const { isAuthenticated, signIn } = useAuthContext();
   const queryClient = useQueryClient();
 
-  const { data: comments, isLoading, error } = useQuery<Comment[]>({
+  const { data: comments, isLoading, error } = useQuery<CommentView[]>({
     queryKey: [`/api/snippets/${snippetId}/comments`],
   });
 
@@ -118,13 +118,13 @@ export default function CommentSection({ snippetId }: CommentSectionProps) {
             >
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
-                  {comment.userId ? comment.userId.charAt(0).toUpperCase() : "A"}
+                  {comment.authorName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium text-foreground">
-                    {comment.userId || "Anonymous"}
+                    {comment.authorName}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}

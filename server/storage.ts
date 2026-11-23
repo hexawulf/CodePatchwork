@@ -6,6 +6,7 @@ import {
   comments, type Comment, type InsertComment,
   type LibraryMeta,
 } from "@shared/schema";
+import type { CommentView } from "@shared/types";
 import { eq, and, or, inArray, isNotNull, ilike, sql, desc, asc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { db } from "./db";
@@ -65,7 +66,7 @@ export interface IStorage {
   toggleSnippetPublic(snippetId: number): Promise<Snippet>;
 
   getComment(id: number): Promise<Comment | undefined>;
-  getCommentsBySnippetId(snippetId: number): Promise<Comment[]>;
+  getCommentsBySnippetId(snippetId: number): Promise<CommentView[]>;
   createComment(comment: InsertComment): Promise<Comment>;
   updateComment(id: number, comment: Partial<InsertComment>): Promise<Comment>;
   deleteComment(id: number): Promise<void>;
@@ -484,12 +485,24 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async getCommentsBySnippetId(snippetId: number): Promise<Comment[]> {
-    return db
-      .select()
+  async getCommentsBySnippetId(snippetId: number): Promise<CommentView[]> {
+    const rows = await db
+      .select({
+        id: comments.id,
+        snippetId: comments.snippetId,
+        content: comments.content,
+        createdAt: comments.createdAt,
+        updatedAt: comments.updatedAt,
+        displayName: users.displayName,
+      })
       .from(comments)
+      .leftJoin(users, eq(users.id, comments.userId))
       .where(eq(comments.snippetId, snippetId))
       .orderBy(asc(comments.createdAt));
+    return rows.map(({ displayName, ...c }) => ({
+      ...c,
+      authorName: displayName?.trim() || "Anonymous",
+    }));
   }
 
   async createComment(comment: InsertComment): Promise<Comment> {

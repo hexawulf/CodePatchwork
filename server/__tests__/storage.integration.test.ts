@@ -123,7 +123,10 @@ describe.skipIf(!HAS_TEST_DB)("DatabaseStorage (real PostgreSQL integration)", (
       content: "Integration check comment",
       userId: uid,
     });
-    expect((await storage.getCommentsBySnippetId(pub.id)).map((c) => c.id)).toEqual([comment.id]);
+    const views = await storage.getCommentsBySnippetId(pub.id);
+    expect(views.map((c) => c.id)).toEqual([comment.id]);
+    expect(views[0]).not.toHaveProperty("userId");
+    expect(typeof views[0].authorName).toBe("string");
 
     await storage.deleteSnippet(pub.id);
     expect(await storage.getSnippet(pub.id)).toBeUndefined();
