@@ -164,7 +164,7 @@ vi.mock("../storage", () => {
 });
 
 import { registerRoutes } from "../routes";
-import { injectShareMeta } from "../vite";
+import { htmlForPath, injectShareMeta, pathnameFromOriginalUrl, setCanonical } from "../vite";
 
 const ALICE = { Authorization: "Bearer token-alice" };
 const BOB = { Authorization: "Bearer token-bob" };
@@ -513,6 +513,53 @@ describe("OpenGraph meta injection", () => {
     const out = injectShareMeta(html, "jQuery $& $1 helper", "Price $& per $1");
     expect(out).toContain("<title>jQuery $&amp; $1 helper — CodePatchwork</title>");
     expect(out).toContain('og:description" content="Price $&amp; per $1"');
+  });
+});
+
+describe("canonical link", () => {
+  const shell = [
+    "<head>",
+    '    <meta name="description" content="CodePatchwork is a fast, keyboard-first visual code snippet library.">',
+    '    <link rel="canonical" href="https://codepatchwork.com/">',
+    '    <meta property="og:title" content="CodePatchwork">',
+    "</head>",
+  ].join("\n");
+
+  it("keeps the homepage canonical only on /", () => {
+    expect(htmlForPath(shell, "/", false)).toContain(
+      '<link rel="canonical" href="https://codepatchwork.com/">',
+    );
+    const library = htmlForPath(shell, "/collections", false);
+    expect(library).not.toContain("rel=\"canonical\"");
+    expect(library).toContain('name="description"');
+  });
+
+  it("points a public shared snippet at its own URL and drops the homepage canonical", () => {
+    const out = htmlForPath(injectShareMeta(shell, "Hooks $&", "A snippet"), "/shared/abc_12", true);
+    expect(out).toContain('<link rel="canonical" href="https://codepatchwork.com/shared/abc_12">');
+    expect(out).not.toContain('href="https://codepatchwork.com/"');
+    expect(out).toContain('og:title" content="Hooks $&amp; — CodePatchwork"');
+  });
+
+  it("does not canonicalize a non-public share page to the homepage", () => {
+    const out = htmlForPath(shell, "/shared/priv-share", false);
+    expect(out).not.toContain("rel=\"canonical\"");
+  });
+
+  it("reads the pathname from originalUrl, including the wildcard-mount case", () => {
+    expect(pathnameFromOriginalUrl("/collections?tab=1")).toBe("/collections");
+    const library = htmlForPath(shell, pathnameFromOriginalUrl("/collections?tab=1"), false);
+    expect(library).not.toContain("rel=\"canonical\"");
+
+    const encoded = htmlForPath(shell, pathnameFromOriginalUrl("/shared/abc%20d"), true);
+    expect(encoded).toContain('<link rel="canonical" href="https://codepatchwork.com/shared/abc%20d">');
+  });
+
+  it("escapes a canonical href and ignores $& replacement tokens", () => {
+    const out = setCanonical("<head></head>", 'https://codepatchwork.com/shared/a"b&c$&');
+    expect(out).toContain(
+      '<link rel="canonical" href="https://codepatchwork.com/shared/a&quot;b&amp;c$&amp;">',
+    );
   });
 });
 

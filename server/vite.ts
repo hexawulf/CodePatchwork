@@ -17,6 +17,45 @@ function escapeHtmlAttr(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
+const CANONICAL_TAG = /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/;
+
+/** Replace or remove the document canonical. `null` drops the tag. */
+export function setCanonical(html: string, href: string | null): string {
+  if (href == null) {
+    return html.replace(/^[ \t]*<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>[ \t]*\r?\n?/m, "");
+  }
+  const tag = `<link rel="canonical" href="${escapeHtmlAttr(href)}">`;
+  if (CANONICAL_TAG.test(html)) {
+    return html.replace(CANONICAL_TAG, () => tag);
+  }
+  return html.replace(/<head[^>]*>/, (head) => `${head}\n    ${tag}`);
+}
+
+/** Pathname for HTML selection. `app.use("*")` rewrites `req.path` to `/`, so callers pass `originalUrl`. */
+export function pathnameFromOriginalUrl(originalUrl: string): string {
+  const pathOnly = originalUrl.split("?")[0] || "/";
+  return pathOnly.startsWith("/") ? pathOnly : `/${pathOnly}`;
+}
+
+function decodePathSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+/** Keep the homepage canonical on `/`. Point a public share page at itself. Drop it elsewhere. */
+export function htmlForPath(html: string, pathname: string, shareCanonical: boolean): string {
+  if (pathname === "/") return html;
+  const share = pathname.match(/^\/shared\/([^/]+)\/?$/);
+  if (share && shareCanonical) {
+    const shareId = encodeURIComponent(decodePathSegment(share[1]));
+    return setCanonical(html, `https://codepatchwork.com/shared/${shareId}`);
+  }
+  return setCanonical(html, null);
+}
+
 export function injectShareMeta(html: string, title: string, description: string): string {
   const safeTitle = escapeHtmlAttr(`${title} — CodePatchwork`);
   const safeDesc = escapeHtmlAttr(description);
@@ -68,7 +107,9 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${randomUUID()}"`,
       );
-      const page = await vite.transformIndexHtml(url, template);
+      const transformed = await vite.transformIndexHtml(url, template);
+      const pathname = pathnameFromOriginalUrl(req.originalUrl);
+      const page = htmlForPath(transformed, pathname, pathname.startsWith("/shared/"));
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
@@ -115,10 +156,11 @@ export function serveStatic(app: Express) {
         const desc =
           snippet.description?.trim() ||
           `${snippet.language || "Code"} snippet shared on CodePatchwork`;
+        const pathname = pathnameFromOriginalUrl(req.originalUrl);
         res
           .setHeader("Content-Type", "text/html; charset=UTF-8")
           .setHeader("Cache-Control", "no-cache")
-          .send(injectShareMeta(indexHtml, snippet.title, desc));
+          .send(htmlForPath(injectShareMeta(indexHtml, snippet.title, desc), pathname, true));
         return;
       }
     } catch {
@@ -127,10 +169,14 @@ export function serveStatic(app: Express) {
     res
       .setHeader("Content-Type", "text/html; charset=UTF-8")
       .setHeader("Cache-Control", "no-cache")
-      .send(indexHtml);
+      .send(htmlForPath(indexHtml, pathnameFromOriginalUrl(req.originalUrl), false));
   });
 
-  app.use("*", (_req, res) => {
-    res.setHeader("Cache-Control", "no-cache").sendFile(indexPath);
+  // `/` is served by express.static as dist/public/index.html, which keeps the homepage canonical.
+  app.use("*", (req, res) => {
+    res
+      .setHeader("Content-Type", "text/html; charset=UTF-8")
+      .setHeader("Cache-Control", "no-cache")
+      .send(htmlForPath(indexHtml, pathnameFromOriginalUrl(req.originalUrl), false));
   });
 }
